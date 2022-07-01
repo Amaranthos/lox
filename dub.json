@@ -1,0 +1,18 @@
+{
+  "name": "lox",
+  "targetPath": "bin",
+  "configurations": [
+    {
+      "name": "jlox",
+      "targetType": "executable",
+      "mainSourceFile": "source/jlox/main.d",
+      "targetName": "jlox"
+    },
+    {
+      "name": "clox",
+      "targetType": "executable",
+      "mainSourceFile": "source/clox/main.d",
+      "targetName": "clox"
+    }
+  ]
+}

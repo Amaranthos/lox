@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "dub",
+      "run": true,
+      "cwd": "${workspaceFolder}",
+      "compiler": "$current",
+      "archType": "$current",
+      "buildType": "$current",
+      "configuration": "$current",
+      "problemMatcher": ["$dmd"],
+      "group": "build",
+      "label": "dub: Run lox"
+    }
+  ]
+}
