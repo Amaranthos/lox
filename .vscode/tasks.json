@@ -3,7 +3,7 @@
   "tasks": [
     {
       "type": "dub",
-      "run": true,
+      "run": false,
       "cwd": "${workspaceFolder}",
       "compiler": "$current",
       "archType": "$current",
@@ -11,7 +11,15 @@
       "configuration": "$current",
       "problemMatcher": ["$dmd"],
       "group": "build",
-      "label": "dub: Run lox"
+      "label": "dub: Build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": true
+      }
     }
   ]
 }

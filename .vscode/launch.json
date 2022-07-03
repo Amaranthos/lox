@@ -1,0 +1,25 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "code-d",
+      "request": "launch",
+      "dubBuild": true,
+      "name": "Run jlox: REPL",
+      "cwd": "${workspaceFolder}",
+      "program": "bin/jlox"
+    },
+    {
+      "type": "code-d",
+      "request": "launch",
+      "dubBuild": true,
+      "name": "Run jlox: [file]",
+      "cwd": "${workspaceFolder}",
+      "program": "bin/jlox",
+      "args": ["data/${fileBasename}"]
+    }
+  ]
+}
