@@ -17,12 +17,20 @@ struct Token
 		this.line = line;
 	}
 
-	string toString()
-	{
-		import std.string : format;
+	// string toString() const
+	// {
+	// 	import std.string : format;
 
-		return format!"%s %s %s"(type, lexeme, literal.toString);
-	}
+	// 	switch (type) with (Type)
+	// 	{
+	// 	case STRING:
+	// 		return format!"%s %s %s"(type, lexeme, literal.get!string);
+	// 	case NUMBER:
+	// 		return format!"%s %s %s"(type, lexeme, literal.get!double);
+	// 	default:
+	// 		return format!"%s %s"(type, lexeme);
+	// 	}
+	// }
 
 	enum Type
 	{

@@ -13,32 +13,42 @@ auto scanTokens(string source)
 		size_t start = 0;
 		size_t current = 0;
 		size_t line = 1;
+		Token token;
 
-		@property bool empty() const @safe
+		this(string source)
 		{
+			this.source = source;
+
+			popFront();
+		}
+
+		@property bool empty() const pure @safe
+		{
+			debug (verbose)
+				writefln!"empty(): %s >= %s: %s"(current, source.length, current >= source.length);
 			return current >= source.length;
 		}
 
-		Token token(Token.Type type)
+		void tokenOf(Token.Type type)
 		{
-			return token(type, null);
+			tokenOf(type, null);
 		}
 
-		Token token(Token.Type type, string literal)
-		{
-			debug (verbose)
-				writefln!"token(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
-			return Token(type, source[start .. current], literal, line);
-		}
-
-		Token token(Token.Type type, double literal)
+		void tokenOf(Token.Type type, string literal)
 		{
 			debug (verbose)
-				writefln!"token(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
-			return Token(type, source[start .. current], literal, line);
+				writefln!"tokenOf(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
+			token = Token(type, source[start .. current], literal, line);
 		}
 
-		Token str()
+		void tokenOf(Token.Type type, double literal)
+		{
+			debug (verbose)
+				writefln!"tokenOf(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
+			token = Token(type, source[start .. current], literal, line);
+		}
+
+		void str()
 		{
 			while (peek() != '"' && !empty)
 			{
@@ -52,15 +62,14 @@ auto scanTokens(string source)
 				import jlox.main : error;
 
 				error(line, "Unterminated string");
-				return Token();
+				return;
 			}
 
 			advance();
-
-			return token(Token.Type.STRING, source[start + 1 .. current - 1]);
+			tokenOf(Token.Type.STRING, source[start + 1 .. current - 1]);
 		}
 
-		Token num()
+		void num()
 		{
 			while (isDigit(peek()))
 				advance();
@@ -72,19 +81,19 @@ auto scanTokens(string source)
 					advance();
 			}
 
-			return token(Token.Type.NUMBER, source[start .. current].to!double);
+			tokenOf(Token.Type.NUMBER, source[start .. current].to!double);
 		}
 
-		Token identifier()
+		void identifier()
 		{
 			while (isAlphaNumeric(peek()))
 				advance();
 
-			return token(source[start .. current] in keywords ?
+			tokenOf(source[start .. current] in keywords ?
 					keywords[source[start .. current]] : Token.Type.IDENTIFIER);
 		}
 
-		bool match(char expected)
+		bool match(char expected) pure @safe
 		{
 			if (empty)
 				return false;
@@ -95,55 +104,68 @@ auto scanTokens(string source)
 			return true;
 		}
 
-		char advance()
+		char advance() @safe
 		{
 			return source[current++];
 		}
 
-		char peek()
+		char peek() const pure @safe
 		{
 			if (empty)
 				return '\0';
 			return source[current];
 		}
 
-		char peekNext()
+		char peekNext() const pure @safe
 		{
 			if (current + 1 >= source.length)
 				return '\0';
 			return source[current + 1];
 		}
 
-		@property Token front()
+		@property Token front() const
 		{
+			debug (verbose)
+				writefln("front(): %s", token);
+
+			return token;
+		}
+
+		void popFront()
+		{
+			start = current;
 			char c = advance();
 
 			debug (verbose)
-				writefln!"front(): c: %s start: %s current: %s"(c, start, current);
+				writefln!"front(): c: '%c' start: %s current: %s"(c, start, current);
 
 			switch (c) with (Token.Type)
 			{
 				// dfmt off
-			case '(': return token(LEFT_PAREN);
-			case ')': return token(RIGHT_PAREN);
-			case '{': return token(LEFT_BRACE);
-			case '}': return token(RIGHT_BRACE);
-			case ',': return token(COMMA);
-			case '.': return token(DOT);
-			case '-': return token(MINUS);
-			case '+': return token(PLUS);
-			case ';': return token(SEMICOLON);
-			case '*': return token(STAR);
+			case '(': tokenOf(LEFT_PAREN);  break;
+			case ')': tokenOf(RIGHT_PAREN); break;
+			case '{': tokenOf(LEFT_BRACE);  break;
+			case '}': tokenOf(RIGHT_BRACE); break;
+			case ',': tokenOf(COMMA);       break;
+			case '.': tokenOf(DOT);         break;
+			case '-': tokenOf(MINUS);       break;
+			case '+': tokenOf(PLUS);        break;
+			case ';': tokenOf(SEMICOLON);   break;
+			case '*': tokenOf(STAR);        break;
 			// dfmt on
 
 			case '!':
-				return token(match('=') ? BANG_EQUAL : BANG);
+				tokenOf(match('=') ? BANG_EQUAL : BANG);
+				break;
 			case '=':
-				return token(match('=') ? EQUAL_EQUAL : EQUAL);
+				tokenOf(match('=') ? EQUAL_EQUAL : EQUAL);
+				break;
 			case '<':
-				return token(match('=') ? LESS_EQUAL : LESS);
+				tokenOf(match('=') ? LESS_EQUAL : LESS);
+				break;
 			case '>':
-				return token(match('=') ? GREATER_EQUAL : GREATER);
+				tokenOf(match('=') ? GREATER_EQUAL : GREATER);
+				break;
 
 			case '/':
 				if (match('/'))
@@ -152,10 +174,11 @@ auto scanTokens(string source)
 					{
 						advance();
 					}
-					return front();
+					popFront();
 				}
 				else
-					return token(SLASH);
+					tokenOf(SLASH);
+				break;
 
 			case '\n':
 				++line;
@@ -163,54 +186,55 @@ auto scanTokens(string source)
 			case ' ':
 			case '\r':
 			case '\t':
-				popFront();
-				return empty ? token(EOF) : front();
+				if (empty)
+					tokenOf(EOF);
+				else
+					popFront();
+				break;
 
 			case '"':
-				return str();
+				str();
+				break;
 
 			case '0': .. case '9':
-				return num();
+				num();
+				break;
 
 			case 'a': .. case 'z':
 			case 'A': .. case 'Z':
 			case '_':
-				return identifier();
+				identifier();
+				break;
 
 			default:
 				import jlox.main : error;
 				import std.string : format;
 
 				error(line, source[current].format!"Unexpected character: '%s'");
-				return Token();
+				break;
 			}
 		}
 
-		void popFront() @safe
-		{
-			start = current;
-		}
-
-		bool isDigit(char c)
+		bool isDigit(char c) const pure @safe
 		{
 			return c >= '0' && c < '9';
 		}
 
-		bool isAlpha(char c)
+		bool isAlpha(char c) const pure @safe
 		{
 			return (c >= 'a' && c <= 'z') ||
 				(c >= 'A' && c <= 'Z') ||
 				c == '_';
 		}
 
-		bool isAlphaNumeric(char c)
+		bool isAlphaNumeric(char c) const pure @safe
 		{
 			return isAlpha(c) || isDigit(c);
 		}
 
 		// dfmt off
 		static enum Token.Type[string] keywords = [
-			"and":   Token.Type.AND,
+			"and":    Token.Type.AND,
 			"class":  Token.Type.CLASS,
 			"else":   Token.Type.ELSE,
 			"false":  Token.Type.FALSE,
@@ -232,3 +256,53 @@ auto scanTokens(string source)
 
 	return Scanner(source);
 }
+
+/*
+NOTE: https://forum.dlang.org/post/nyfcolufyurjkwjhwqfm@forum.dlang.org
+
+struct TokenStream
+{
+	this(SourceBuffer source)
+	{
+		this.cursor = source.text.ptr;
+		advance(this);
+	}
+
+	bool empty() const
+	{
+		return token.type == TokenType.eof;
+	}
+
+	ref front() return scope const
+	{
+		return token;
+	}
+
+	void popFront()
+	{
+		switch (token.type)
+		{
+		default:
+			advance(this);
+			break;
+		case TokenType.eof:
+			break;
+		case TokenType.error:
+			token.type = TokenType.eof;
+			token.lexSpan = LexicalSpan(token.lexSpan.end, token.lexSpan.end);
+			break;
+		}
+	}
+
+	TokenStream save() const
+	{
+		return this;
+	}
+
+private:
+
+	const(char)* cursor;
+	Location location;
+	Token token;
+}
+*/
