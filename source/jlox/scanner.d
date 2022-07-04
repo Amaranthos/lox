@@ -3,6 +3,7 @@ module jlox.scanner;
 import std.conv : to;
 import std.stdio : writeln, writefln;
 
+import jlox.errors;
 import jlox.token : Token;
 
 auto scanTokens(string source)
@@ -59,8 +60,6 @@ auto scanTokens(string source)
 
 			if (empty)
 			{
-				import jlox.main : error;
-
 				error(line, "Unterminated string");
 				return;
 			}
@@ -207,7 +206,6 @@ auto scanTokens(string source)
 				break;
 
 			default:
-				import jlox.main : error;
 				import std.string : format;
 
 				error(line, source[current].format!"Unexpected character: '%s'");
@@ -217,7 +215,7 @@ auto scanTokens(string source)
 
 		bool isDigit(char c) const pure @safe
 		{
-			return c >= '0' && c < '9';
+			return c >= '0' && c <= '9';
 		}
 
 		bool isAlpha(char c) const pure @safe

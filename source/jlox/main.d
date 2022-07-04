@@ -3,27 +3,34 @@ module jlox.main;
 import std.conv : to;
 import std.stdio : writeln, writefln;
 
-bool hadError = false;
+import jlox.errors;
+import jlox.ast_printer;
 
-int main(string[] args)
+version (printAST)
 {
-	args = args[1 .. $];
-	switch (args.length)
+}
+else
+{
+	int main(string[] args)
 	{
-	case 0:
-		runPrompt();
-		break;
+		args = args[1 .. $];
+		switch (args.length)
+		{
+		case 0:
+			runPrompt();
+			break;
 
-	case 1:
-		runFile(args[0]);
-		break;
+		case 1:
+			runFile(args[0]);
+			break;
 
-	default:
-		writeln("Usage: jlox [script]");
-		return 64;
+		default:
+			writeln("Usage: jlox [script]");
+			return 64;
+		}
+
+		return 0;
 	}
-
-	return 0;
 }
 
 void runFile(string path)
@@ -61,15 +68,4 @@ void run(string source)
 	{
 		token.writeln;
 	}
-}
-
-void error(size_t line, string message) @safe
-{
-	report(line, "", message);
-}
-
-void report(size_t line, string where, string message) @safe
-{
-	writefln!"(%s): Error%s: %s"(line, where, message);
-	hadError = true;
 }

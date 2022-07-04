@@ -5,3 +5,9 @@ print "Hello, world...";
 1 - 2;
 1 * 2;
 1 / 2;
+3.1415926535897;
+
+var answerToLifeTheUniverseAndEverything = 42;
+
+class Classy {}
+fun callable() {}
