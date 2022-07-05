@@ -62,10 +62,25 @@ void runPrompt()
 
 void run(string source)
 {
-	import jlox.scanner : scanTokens;
+	import std.algorithm : each;
 
-	foreach (token; source.scanTokens)
-	{
-		token.writeln;
-	}
+	import jlox.ast_printer : printAST;
+	import jlox.scanner : scanTokens;
+	import jlox.parser : parseTokens;
+
+	auto tokens = source
+		.scanTokens;
+
+	// tokens
+	// 	.each!writeln;
+
+	auto ast = tokens
+		.parseTokens;
+
+	if (hadError)
+		return;
+
+	ast
+		.printAST
+		.writeln;
 }

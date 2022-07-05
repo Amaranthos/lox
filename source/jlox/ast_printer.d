@@ -70,6 +70,3 @@ version (printAST)
 		// dfmt on
 	}
 }
-
-// auto printAst(Range)(Range tokens)
-// 		if (isForwardRange!Range && is(ElementType!Range : Token))

@@ -8,7 +8,8 @@ import jlox.token : Token;
 
 auto scanTokens(string source)
 {
-	struct Scanner
+
+	static struct Scanner
 	{
 		string source;
 		size_t start = 0;
@@ -23,11 +24,11 @@ auto scanTokens(string source)
 			popFront();
 		}
 
-		@property bool empty() const pure @safe
+		@property bool empty() const @safe
 		{
-			debug (verbose)
+			version (verbose)
 				writefln!"empty(): %s >= %s: %s"(current, source.length, current >= source.length);
-			return current >= source.length;
+			return current >= source.length + 1;
 		}
 
 		void tokenOf(Token.Type type)
@@ -37,28 +38,28 @@ auto scanTokens(string source)
 
 		void tokenOf(Token.Type type, string literal)
 		{
-			debug (verbose)
+			version (verbose)
 				writefln!"tokenOf(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
 			token = Token(type, source[start .. current], literal, line);
 		}
 
 		void tokenOf(Token.Type type, double literal)
 		{
-			debug (verbose)
+			version (verbose)
 				writefln!"tokenOf(): Token(type: %s, lexeme: %s, literal: %s, line: %s)"(type, source[start .. current], literal, line);
 			token = Token(type, source[start .. current], literal, line);
 		}
 
 		void str()
 		{
-			while (peek() != '"' && !empty)
+			while (peek() != '"' && !isAtEnd())
 			{
 				if (peek() == '\n')
 					++line;
 				advance();
 			}
 
-			if (empty)
+			if (isAtEnd())
 			{
 				error(line, "Unterminated string");
 				return;
@@ -94,7 +95,7 @@ auto scanTokens(string source)
 
 		bool match(char expected) pure @safe
 		{
-			if (empty)
+			if (isAtEnd())
 				return false;
 			if (source[current] != expected)
 				return false;
@@ -104,13 +105,14 @@ auto scanTokens(string source)
 		}
 
 		char advance() @safe
+		in (!isAtEnd())
 		{
 			return source[current++];
 		}
 
 		char peek() const pure @safe
 		{
-			if (empty)
+			if (isAtEnd())
 				return '\0';
 			return source[current];
 		}
@@ -124,18 +126,31 @@ auto scanTokens(string source)
 
 		@property Token front() const
 		{
-			debug (verbose)
+			version (verbose)
 				writefln("front(): %s", token);
 
 			return token;
 		}
 
+		Scanner save() const
+		{
+			return this;
+		}
+
 		void popFront()
 		{
 			start = current;
+
+			if (isAtEnd())
+			{
+				tokenOf(Token.Type.EOF);
+				++current;
+				return;
+			}
+
 			char c = advance();
 
-			debug (verbose)
+			version (verbose)
 				writefln!"front(): c: '%c' start: %s current: %s"(c, start, current);
 
 			switch (c) with (Token.Type)
@@ -169,7 +184,7 @@ auto scanTokens(string source)
 			case '/':
 				if (match('/'))
 				{
-					while (peek() != '\n' && !empty)
+					while (peek() != '\n' && !isAtEnd())
 					{
 						advance();
 					}
@@ -185,10 +200,7 @@ auto scanTokens(string source)
 			case ' ':
 			case '\r':
 			case '\t':
-				if (empty)
-					tokenOf(EOF);
-				else
-					popFront();
+				popFront();
 				break;
 
 			case '"':
@@ -211,6 +223,11 @@ auto scanTokens(string source)
 				error(line, source[current].format!"Unexpected character: '%s'");
 				break;
 			}
+		}
+
+		bool isAtEnd() const pure @safe
+		{
+			return current >= source.length;
 		}
 
 		bool isDigit(char c) const pure @safe
@@ -251,6 +268,10 @@ auto scanTokens(string source)
 		];
 		// dfmt on
 	}
+
+	import std.range : isForwardRange, ElementType;
+
+	static assert(isForwardRange!Scanner && is(ElementType!Scanner : Token));
 
 	return Scanner(source);
 }
