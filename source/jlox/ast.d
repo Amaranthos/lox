@@ -7,6 +7,7 @@ interface %1$s {
 		%2$s
 	}
 	string accept(Visitor!string visitor);
+	Variant accept(Visitor!Variant visitor);
 }
 };
 
@@ -15,6 +16,7 @@ class %1$s : %2$s {
 	%3$s
 	this(%4$s) { %5$s }
 	string accept(%2$s.Visitor!string visitor) { return visitor.visit(this); }
+	Variant accept(%2$s.Visitor!Variant visitor) { return visitor.visit(this); }
 }
 };
 

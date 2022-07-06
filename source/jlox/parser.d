@@ -24,7 +24,6 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 
 			this.range = tokens;
 			this.tokens = tokens.array;
-			this.tokens ~= Token(Token.Type.EOF, "", null, 1);
 		}
 
 		Expr parse()

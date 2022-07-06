@@ -46,6 +46,9 @@ void runFile(string path)
 
 	if (hadError)
 		exit(65);
+
+	if (hadRuntimeError)
+		exit(70);
 }
 
 void runPrompt()
@@ -63,16 +66,19 @@ void runPrompt()
 void run(string source)
 {
 	import std.algorithm : each;
+	import std.range : array, join;
 
 	import jlox.ast_printer : printAST;
 	import jlox.scanner : scanTokens;
 	import jlox.parser : parseTokens;
+	import jlox.interpreter : interpret;
 
 	auto tokens = source
 		.scanTokens;
 
-	// tokens
-	// 	.each!writeln;
+	tokens
+		.array
+		.writefln!"%(%s\n%)\n";
 
 	auto ast = tokens
 		.parseTokens;
@@ -82,5 +88,9 @@ void run(string source)
 
 	ast
 		.printAST
-		.writeln;
+		.writeln("\n");
+
+	ast
+		.interpret
+		.writeln("\n");
 }

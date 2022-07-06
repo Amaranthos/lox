@@ -24,7 +24,7 @@ string printAST(Expr expr)
 
 		string visit(Literal expr)
 		{
-			if (expr.value.peek!(typeof(null)) is null)
+			if (expr.value.type != typeid(null))
 				return expr.value.toString();
 			return "nil";
 		}
