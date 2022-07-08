@@ -26,21 +26,126 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 			this.tokens = tokens.array;
 		}
 
-		Expr parse()
+		Stmt[] parse()
+		{
+			Stmt[] statements;
+			while (!isAtEnd())
+				statements ~= declaration();
+
+			return statements;
+		}
+
+	private:
+		Stmt declaration()
 		{
 			try
 			{
-				return expression();
+				with (Token.Type)
+				{
+					if (match(VAR))
+						return varDeclaration();
+					return statement();
+				}
 			}
 			catch (ParseException e)
 			{
+				sync();
 				return null;
+			}
+		}
+
+		Stmt varDeclaration()
+		{
+			with (Token.Type)
+			{
+				Token name = consume(IDENTIFIER, "Expect variable name");
+
+				Expr initializer = null;
+				if (match(EQUAL))
+				{
+					initializer = expression();
+				}
+
+				consume(SEMICOLON, "Expect ';' after variable declaration");
+				return new Var(name, initializer);
+			}
+		}
+
+		Stmt statement()
+		{
+			with (Token.Type)
+			{
+				if (match(PRINT))
+					return printStatement();
+				if (match(LEFT_BRACE))
+					return new Block(block());
+
+				return expressionStatement();
+			}
+		}
+
+		Stmt printStatement()
+		{
+			Expr value = expression();
+			consume(Token.Type.SEMICOLON, "Expect ';' after value");
+			return new Print(value);
+		}
+
+		Stmt expressionStatement()
+		{
+			Expr expr = expression();
+			consume(Token.Type.SEMICOLON, "Expect ';' after value");
+			return new Expression(expr);
+		}
+
+		Stmt[] block()
+		{
+			Stmt[] statements;
+
+			with (Token.Type)
+			{
+
+				while (!check(RIGHT_BRACE) && !isAtEnd())
+				{
+					statements ~= declaration();
+				}
+
+				import std.stdio : writeln;
+
+				statements.writeln();
+
+				consume(RIGHT_BRACE, "Expect '}' after block");
+				return statements;
 			}
 		}
 
 		Expr expression()
 		{
-			return equality();
+			return assignment();
+		}
+
+		Expr assignment()
+		{
+			Expr expr = equality();
+
+			with (Token.Type)
+			{
+				if (match(EQUAL))
+				{
+					Token equals = previous();
+					Expr value = assignment();
+
+					if (cast(Variable) expr)
+					{
+						Token name = (cast(Variable) expr).name;
+						return new Assign(name, value);
+					}
+
+					error(equals, "Invalid assignment target");
+				}
+			}
+
+			return expr;
 		}
 
 		Expr equality()
@@ -138,6 +243,7 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 				if (match(NIL)) return new Literal(Variant(null));
 				if (match(NUMBER)) return new Literal(Variant(previous().literal.get!double));
 				if (match(STRING)) return new Literal(Variant(previous().literal.get!string));
+				if (match(IDENTIFIER)) return new Variable(previous());
 				// dfmt on
 
 				if (match(LEFT_PAREN))

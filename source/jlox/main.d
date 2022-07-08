@@ -73,24 +73,13 @@ void run(string source)
 	import jlox.parser : parseTokens;
 	import jlox.interpreter : interpret;
 
-	auto tokens = source
-		.scanTokens;
-
-	tokens
-		.array
-		.writefln!"%(%s\n%)\n";
-
-	auto ast = tokens
+	auto ast = source
+		.scanTokens
 		.parseTokens;
 
 	if (hadError)
 		return;
 
 	ast
-		.printAST
-		.writeln("\n");
-
-	ast
-		.interpret
-		.writeln("\n");
+		.interpret;
 }

@@ -6,6 +6,8 @@ import std.stdio : writeln, writefln;
 import jlox.errors;
 import jlox.token : Token;
 
+// version = verbose;
+
 auto scanTokens(string source)
 {
 
@@ -16,6 +18,7 @@ auto scanTokens(string source)
 		size_t current = 0;
 		size_t line = 1;
 		Token token;
+		bool eofEmitted = false;
 
 		this(string source)
 		{
@@ -26,9 +29,17 @@ auto scanTokens(string source)
 
 		@property bool empty() const @safe
 		{
+			return eofEmitted;
+		}
+
+		@property Token front()
+		{
 			version (verbose)
-				writefln!"empty(): %s >= %s: %s"(current, source.length, current >= source.length);
-			return current >= source.length + 1;
+				writefln("front(): %s", token);
+
+			eofEmitted = current == source.length + 1;
+
+			return token;
 		}
 
 		void tokenOf(Token.Type type)
@@ -124,14 +135,6 @@ auto scanTokens(string source)
 			return source[current + 1];
 		}
 
-		@property Token front() const
-		{
-			version (verbose)
-				writefln("front(): %s", token);
-
-			return token;
-		}
-
 		Scanner save() const
 		{
 			return this;
@@ -139,6 +142,9 @@ auto scanTokens(string source)
 
 		void popFront()
 		{
+			if (eofEmitted)
+				return;
+
 			start = current;
 
 			if (isAtEnd())

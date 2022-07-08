@@ -12,6 +12,11 @@ string printAST(Expr expr)
 
 	class Printer : Visitor
 	{
+		string visit(Assign expr)
+		{
+			return parenthesize("=", expr.value);
+		}
+
 		string visit(Binary expr)
 		{
 			return parenthesize(expr.operator.lexeme, expr.left, expr.right);
@@ -24,7 +29,7 @@ string printAST(Expr expr)
 
 		string visit(Literal expr)
 		{
-			if (expr.value.type != typeid(null))
+			if (expr.value.type == typeid(null))
 				return expr.value.toString();
 			return "nil";
 		}
@@ -32,6 +37,11 @@ string printAST(Expr expr)
 		string visit(Unary expr)
 		{
 			return parenthesize(expr.operator.lexeme, expr.right);
+		}
+
+		string visit(Variable expr)
+		{
+			return "";
 		}
 
 		private string parenthesize(string name, Expr[] exprs...)

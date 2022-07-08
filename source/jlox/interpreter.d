@@ -6,12 +6,51 @@ import jlox.ast;
 import jlox.errors : RuntimeException;
 import jlox.token : Token;
 
-string interpret(Expr expr)
+void interpret(Stmt[] statements)
 {
-	alias Visitor = Expr.Visitor!Variant;
+	alias ExprVisitor = Expr.Visitor!Variant;
+	alias StmtVisitor = Stmt.Visitor!void;
 
-	class Interpreter : Visitor
+	class Interpreter : ExprVisitor, StmtVisitor
 	{
+		private Env env = new Env();
+
+		void visit(Print stmt)
+		{
+			import std.stdio : writeln;
+
+			auto v = evaluate(stmt.expression);
+			writeln(stringify(v));
+		}
+
+		void visit(Block stmt)
+		{
+			executeBlock(stmt.statements, new Env(env));
+		}
+
+		void visit(Expression stmt)
+		{
+			evaluate(stmt.expression);
+		}
+
+		void visit(Var stmt)
+		{
+			Variant value = null;
+			if (stmt.initializer)
+			{
+				value = evaluate(stmt.initializer);
+			}
+
+			env.define(stmt.name.lexeme, value);
+		}
+
+		Variant visit(Assign expr)
+		{
+			Variant value = evaluate(expr.value);
+			env.assign(expr.name, value);
+			return value;
+		}
+
 		Variant visit(Binary expr)
 		{
 			Variant left = evaluate(expr.left);
@@ -24,6 +63,12 @@ string interpret(Expr expr)
 				return Variant(left.get!double - right.get!double);
 			case SLASH:
 				checkNumberOperands(expr.operator, left, right);
+
+				if (right.get!double == 0.0)
+				{
+					throw new RuntimeException(expr.operator, "Cannot divide by 0");
+				}
+
 				return Variant(left.get!double / right.get!double);
 			case STAR:
 				checkNumberOperands(expr.operator, left, right);
@@ -93,12 +138,41 @@ string interpret(Expr expr)
 			}
 		}
 
-		private Variant evaluate(Expr expr)
+		Variant visit(Variable expr)
+		{
+			return env.get(expr.name);
+		}
+
+	private:
+		Variant evaluate(Expr expr)
 		{
 			return expr.accept(this);
 		}
 
-		private bool isTruthy(Variant var)
+		void executeBlock(Stmt[] statements, Env env)
+		{
+			Env previous = this.env;
+			try
+			{
+				this.env = env;
+
+				foreach (statement; statements)
+				{
+					execute(statement);
+				}
+			}
+			finally
+			{
+				this.env = previous;
+			}
+		}
+
+		void execute(Stmt statement)
+		{
+			statement.accept(this);
+		}
+
+		bool isTruthy(Variant var)
 		{
 			if (var.type == typeid(null))
 				return false;
@@ -108,7 +182,7 @@ string interpret(Expr expr)
 			return true;
 		}
 
-		private bool isEqual(Variant a, Variant b)
+		bool isEqual(Variant a, Variant b)
 		{
 			if (a.type == typeid(null) && b.type == typeid(null))
 				return true;
@@ -119,14 +193,14 @@ string interpret(Expr expr)
 			return a == b;
 		}
 
-		private void checkNumberOperand(Token operator, Variant operand)
+		void checkNumberOperand(Token operator, Variant operand)
 		{
 			if (operand.type == typeid(double))
 				return;
 			throw new RuntimeException(operator, "Operand must be a number");
 		}
 
-		private void checkNumberOperands(Token operator, Variant left, Variant right)
+		void checkNumberOperands(Token operator, Variant left, Variant right)
 		{
 			if (left.type == typeid(double) && right.type == typeid(double))
 				return;
@@ -134,38 +208,96 @@ string interpret(Expr expr)
 		}
 	}
 
-	string stringify(Variant variant)
-	{
-		if (variant.type == typeid(null))
-			return "nil";
-		if (variant.type == typeid(double))
-		{
-			import std.string : endsWith;
-
-			string text = variant.toString();
-			if (text.endsWith(".0"))
-			{
-				text = text[0 .. $ - 2];
-			}
-
-			return text;
-		}
-
-		return variant.toString();
-	}
-
+	auto visitor = new Interpreter();
 	try
 	{
-		Visitor visitor = new Interpreter();
-		return stringify(expr
-				.accept(visitor));
+		foreach (statement; statements)
+		{
+			visitor.execute(statement);
+		}
 	}
 	catch (RuntimeException e)
 	{
 		import jlox.errors : runtimeError;
 
 		runtimeError(e);
+	}
+}
 
-		return "";
+private:
+
+string stringify(Variant variant)
+{
+	if (variant.type == typeid(null))
+		return "nil";
+	if (variant.type == typeid(double))
+	{
+		import std.string : endsWith;
+
+		string text = variant.toString();
+		if (text.endsWith(".0"))
+		{
+			text = text[0 .. $ - 2];
+		}
+
+		return text;
+	}
+
+	return variant.toString();
+}
+
+class Env
+{
+	Env enclosing = null;
+	Variant[string] values;
+
+	this()
+	{
+	}
+
+	this(Env env)
+	{
+		this.enclosing = env;
+	}
+
+	void define(in string name, Variant value)
+	{
+		values[name] = value;
+	}
+
+	Variant get(Token name)
+	{
+		if (name.lexeme in values)
+		{
+			return values[name.lexeme];
+		}
+
+		if (enclosing)
+		{
+			return enclosing.get(name);
+		}
+
+		import std.format : format;
+
+		throw new RuntimeException(name, format!"Undefined variable '%s'"(name.lexeme));
+	}
+
+	void assign(Token name, Variant value)
+	{
+		if (name.lexeme in values)
+		{
+			values[name.lexeme] = value;
+			return;
+		}
+
+		if (enclosing)
+		{
+			enclosing.assign(name, value);
+			return;
+		}
+
+		import std.format : format;
+
+		throw new RuntimeException(name, format!"Undefined variable '%s'"(name.lexeme));
 	}
 }

@@ -1,0 +1,34 @@
+print 1 - (2 * 3) < 4 == false;
+print "Hello, world...";
+print 42;
+
+var beverage = "expresso";
+print beverage;
+
+// print a;
+// var a = "too late!";
+
+var b;
+print b;
+
+var c = 1;
+var d = 2;
+
+print c + d;
+
+var e;
+e = 3;
+// (e) = 3;
+
+print e = 4;
+
+{
+    var a = "first";
+    print a;
+}
+
+{
+    var a = "second";
+    print a;
+}
+
