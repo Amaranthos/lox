@@ -33,6 +33,18 @@ void interpret(Stmt[] statements)
 			evaluate(stmt.expression);
 		}
 
+		void visit(If stmt)
+		{
+			if (isTruthy(evaluate(stmt.condition)))
+			{
+				execute(stmt.thenBranch);
+			}
+			else if (stmt.elseBranch)
+			{
+				execute(stmt.elseBranch);
+			}
+		}
+
 		void visit(Var stmt)
 		{
 			Variant value = null;
@@ -42,6 +54,14 @@ void interpret(Stmt[] statements)
 			}
 
 			env.define(stmt.name.lexeme, value);
+		}
+
+		void visit(While stmt)
+		{
+			while (isTruthy(evaluate(stmt.condition)))
+			{
+				execute(stmt.body);
+			}
 		}
 
 		Variant visit(Assign expr)
@@ -118,6 +138,24 @@ void interpret(Stmt[] statements)
 		Variant visit(Literal expr)
 		{
 			return expr.value;
+		}
+
+		Variant visit(Logical expr)
+		{
+			Variant left = evaluate(expr.left);
+
+			if (expr.operator.type == Token.Type.OR)
+			{
+				if (isTruthy(left))
+					return left;
+			}
+			else
+			{
+				if (!isTruthy(left))
+					return left;
+			}
+
+			return evaluate(expr.right);
 		}
 
 		Variant visit(Unary expr)

@@ -34,6 +34,11 @@ string printAST(Expr expr)
 			return "nil";
 		}
 
+		string visit(Logical expr)
+		{
+			return parenthesize(expr.operator.lexeme, expr.left, expr.right);
+		}
+
 		string visit(Unary expr)
 		{
 			return parenthesize(expr.operator.lexeme, expr.right);

@@ -1,0 +1,33 @@
+if(true) if(false) print true; else print false;
+
+if (1 == 2) print true; else print false;
+if (1 >= 2) print true; else print false;
+if (1 <= 2) print true; else print false;
+if (1 != 2) print true; else print false;
+
+var bool = true;
+if (bool) print true; else print "fuck";
+
+print "hi" or 2;
+print nil or "yes";
+
+print "hi" and 2;
+print nil and "yes";
+
+var count = 0;
+while (count < 10) 
+{
+	print count;
+	count = count + 1;
+}
+
+for (var i = 0; i < 10; i = i + 1) print i;
+
+
+var a = 0;
+var temp;
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
+}

@@ -75,12 +75,86 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 		{
 			with (Token.Type)
 			{
+				if (match(FOR))
+					return forStatement();
+				if (match(IF))
+					return ifStatement();
 				if (match(PRINT))
 					return printStatement();
+				if (match(WHILE))
+					return whileStatement();
 				if (match(LEFT_BRACE))
 					return new Block(block());
 
 				return expressionStatement();
+			}
+		}
+
+		Stmt forStatement()
+		{
+			with (Token.Type)
+			{
+				consume(LEFT_PAREN, "Expect '(' after 'for'");
+
+				Stmt initializer;
+				if (match(SEMICOLON))
+					initializer = null;
+				else if (match(VAR))
+					initializer = varDeclaration();
+				else
+					initializer = expressionStatement();
+
+				Expr condition = null;
+				if (!check(SEMICOLON))
+				{
+					condition = expression();
+				}
+
+				consume(SEMICOLON, "Expect ';' after 'for' condition");
+
+				Expr increment = null;
+				if (!check(RIGHT_PAREN))
+				{
+					increment = expression();
+				}
+
+				consume(RIGHT_PAREN, "Expect ')' after 'for' clauses");
+
+				Stmt forBody = statement();
+
+				if (increment)
+				{
+					forBody = new Block([forBody, new Expression(increment)]);
+				}
+
+				if (condition is null)
+				{
+					import std.variant : Variant;
+
+					condition = new Literal(Variant(true));
+				}
+
+				forBody = new While(condition, forBody);
+
+				if (initializer)
+					forBody = new Block([initializer, forBody]);
+
+				return forBody;
+			}
+		}
+
+		Stmt ifStatement()
+		{
+			with (Token.Type)
+			{
+				consume(LEFT_PAREN, "Expect '(' after 'if'");
+				Expr condition = expression();
+				consume(RIGHT_PAREN, "Expect ')' after if condition");
+
+				Stmt thenBranch = statement();
+				Stmt elseBranch = match(ELSE) ? statement() : null;
+
+				return new If(condition, thenBranch, elseBranch);
 			}
 		}
 
@@ -89,6 +163,16 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 			Expr value = expression();
 			consume(Token.Type.SEMICOLON, "Expect ';' after value");
 			return new Print(value);
+		}
+
+		Stmt whileStatement()
+		{
+			consume(Token.Type.LEFT_PAREN, "Expect '(' after 'while'");
+			Expr condition = expression();
+			consume(Token.Type.RIGHT_PAREN, "Expect ')' after condition");
+			Stmt body = statement();
+
+			return new While(condition, body);
 		}
 
 		Stmt expressionStatement()
@@ -126,7 +210,7 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 
 		Expr assignment()
 		{
-			Expr expr = equality();
+			Expr expr = or();
 
 			with (Token.Type)
 			{
@@ -145,6 +229,36 @@ auto parseTokens(Range)(Range tokens) if (isTokenRange!Range)
 				}
 			}
 
+			return expr;
+		}
+
+		Expr or()
+		{
+			Expr expr = and();
+			with (Token.Type)
+			{
+				while (match(OR))
+				{
+					Token operator = previous();
+					Expr right = and();
+					expr = new Logical(expr, operator, right);
+				}
+			}
+			return expr;
+		}
+
+		Expr and()
+		{
+			Expr expr = equality();
+			with (Token.Type)
+			{
+				while (match(AND))
+				{
+					Token operator = previous();
+					Expr right = equality();
+					expr = new Logical(expr, operator, right);
+				}
+			}
 			return expr;
 		}
 
