@@ -1,6 +1,6 @@
 // NOTE: comment
 print "Hello, world...";
-(( )){};
+// (( )){};
 1 + 2;
 1 - 2;
 1 * 2;
@@ -9,5 +9,5 @@ print "Hello, world...";
 
 var answerToLifeTheUniverseAndEverything = 42;
 
-class Classy {}
+// class Classy {}
 fun callable() {}

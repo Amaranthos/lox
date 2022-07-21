@@ -22,6 +22,11 @@ string printAST(Expr expr)
 			return parenthesize(expr.operator.lexeme, expr.left, expr.right);
 		}
 
+		string visit(Call expr)
+		{
+			return "";
+		}
+
 		string visit(Grouping expr)
 		{
 			return parenthesize("group", expr.expression);
