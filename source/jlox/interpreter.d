@@ -8,53 +8,14 @@ import jlox.env : Env;
 import jlox.lox_func : Callable;
 import jlox.token : Token;
 
-void interpret(Stmt[] statements)
-{
-	auto visitor = new Interpreter();
-	try
-	{
-		foreach (statement; statements)
-		{
-			visitor.execute(statement);
-		}
-	}
-	catch (RuntimeException e)
-	{
-		import jlox.errors : runtimeError;
-
-		runtimeError(e);
-	}
-}
-
-private:
-string stringify(Variant variant)
-{
-	if (variant.type == typeid(null))
-		return "nil";
-	if (variant.type == typeid(double))
-	{
-		import std.string : endsWith, format;
-
-		string text = variant.get!double
-			.format!"%g";
-		if (text.endsWith(".0"))
-		{
-			text = text[0 .. $ - 2];
-		}
-
-		return text;
-	}
-
-	return variant.toString();
-}
-
 alias ExprVisitor = Expr.Visitor!Variant;
 alias StmtVisitor = Stmt.Visitor!void;
 
-public class Interpreter : ExprVisitor, StmtVisitor
+class Interpreter : ExprVisitor, StmtVisitor
 {
 	Env globals = new Env();
 	Env env;
+	int[Expr] locals;
 
 	this()
 	{
@@ -80,6 +41,23 @@ public class Interpreter : ExprVisitor, StmtVisitor
 
 		globals.define("clock", Variant(clock));
 		env = globals;
+	}
+
+	void interpret(Stmt[] statements)
+	{
+		try
+		{
+			foreach (statement; statements)
+			{
+				execute(statement);
+			}
+		}
+		catch (RuntimeException e)
+		{
+			import jlox.errors : runtimeError;
+
+			runtimeError(e);
+		}
 	}
 
 	void visit(Print stmt)
@@ -153,7 +131,12 @@ public class Interpreter : ExprVisitor, StmtVisitor
 	Variant visit(Assign expr)
 	{
 		Variant value = evaluate(expr.value);
-		env.assign(expr.name, value);
+
+		if (expr in locals)
+			env.assignAt(locals[expr], expr.name, value);
+		else
+			globals.assign(expr.name, value);
+
 		return value;
 	}
 
@@ -306,7 +289,7 @@ public class Interpreter : ExprVisitor, StmtVisitor
 
 	Variant visit(Variable expr)
 	{
-		return env.get(expr.name);
+		return lookUpVariable(expr.name, expr);
 	}
 
 	Variant evaluate(Expr expr)
@@ -335,6 +318,11 @@ public class Interpreter : ExprVisitor, StmtVisitor
 	void execute(Stmt statement)
 	{
 		statement.accept(this);
+	}
+
+	void resolve(Expr expr, int depth)
+	{
+		locals[expr] = depth;
 	}
 
 private:
@@ -375,4 +363,34 @@ private:
 			return;
 		throw new RuntimeException(operator, "Operands must be a number");
 	}
+
+	Variant lookUpVariable(Token name, Expr expr)
+	{
+		if (expr in locals)
+			return env.getAt(locals[expr], name.lexeme);
+		else
+			return globals.get(name);
+	}
+}
+
+private:
+string stringify(Variant variant)
+{
+	if (variant.type == typeid(null))
+		return "nil";
+	if (variant.type == typeid(double))
+	{
+		import std.string : endsWith, format;
+
+		string text = variant.get!double
+			.format!"%g";
+		if (text.endsWith(".0"))
+		{
+			text = text[0 .. $ - 2];
+		}
+
+		return text;
+	}
+
+	return variant.toString();
 }

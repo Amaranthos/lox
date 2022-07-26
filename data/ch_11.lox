@@ -1,0 +1,30 @@
+var a = "outer";
+{
+    var a = "inner";
+    print a;
+}
+
+{
+    print a;
+    var a = "inner";
+}
+
+var b = "global";
+{
+    fun showA() {
+        print b;
+    }
+
+    showA();
+    var b = "block";
+    showA();
+}
+
+fun bad() {
+    var a = "first";
+    var a = "second";
+}
+
+bad();
+
+return "at top level";

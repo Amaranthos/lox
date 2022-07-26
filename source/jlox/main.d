@@ -13,6 +13,7 @@ else
 {
 	int main(string[] args)
 	{
+
 		args = args[1 .. $];
 		switch (args.length)
 		{
@@ -71,7 +72,8 @@ void run(string source)
 	import jlox.ast_printer : printAST;
 	import jlox.scanner : scanTokens;
 	import jlox.parser : parseTokens;
-	import jlox.interpreter : interpret;
+	import jlox.interpreter : Interpreter;
+	import jlox.resolver : Resolver;
 
 	auto ast = source
 		.scanTokens
@@ -80,6 +82,13 @@ void run(string source)
 	if (hadError)
 		return;
 
-	ast
-		.interpret;
+	auto interpreter = new Interpreter();
+	auto resolver = new Resolver(interpreter);
+
+	resolver.resolve(ast);
+
+	if (hadError)
+		return;
+
+	interpreter.interpret(ast);
 }

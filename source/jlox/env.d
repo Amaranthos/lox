@@ -42,6 +42,11 @@ class Env
 				name.lexeme));
 	}
 
+	Variant getAt(int dist, string name)
+	{
+		return ancestor(dist).values[name];
+	}
+
 	void assign(Token name, Variant value)
 	{
 		if (name.lexeme in values)
@@ -60,5 +65,21 @@ class Env
 
 		throw new RuntimeException(name, format!"Undefined variable '%s'"(
 				name.lexeme));
+	}
+
+	void assignAt(int dist, Token name, Variant value)
+	{
+		ancestor(dist).values[name.lexeme] = value;
+	}
+
+private:
+	Env ancestor(int dist)
+	{
+		Env env = this;
+		foreach (_; 0 .. dist)
+		{
+			env = env.enclosing;
+		}
+		return env;
 	}
 }
