@@ -15,7 +15,15 @@ alias Map = bool[string];
 private enum FunctionType
 {
 	None,
-	Func
+	Func,
+	Init,
+	Method,
+}
+
+private enum ClassType
+{
+	None,
+	Class,
 }
 
 class Resolver : ExprVisitor, StmtVisitor
@@ -23,6 +31,7 @@ class Resolver : ExprVisitor, StmtVisitor
 	private Interpreter interpreter;
 	private Map[] scopes;
 	private FunctionType currentFunc = FunctionType.None;
+	private ClassType currentClass = ClassType.None;
 
 	this(Interpreter interpreter)
 	{
@@ -42,6 +51,28 @@ class Resolver : ExprVisitor, StmtVisitor
 		beginScope();
 		resolve(stmt.statements);
 		endScope();
+	}
+
+	void visit(Class stmt)
+	{
+		auto enclosingClass = currentClass;
+		currentClass = ClassType.Class;
+
+		declare(stmt.name);
+		define(stmt.name);
+
+		beginScope();
+		scopes.back["this"] = true;
+
+		foreach (method; stmt.methods)
+		{
+			resolveFunc(method, method.name.lexeme == "init" ? FunctionType.Init
+					: FunctionType.Method);
+		}
+
+		endScope();
+
+		currentClass = enclosingClass;
 	}
 
 	void visit(Expression stmt)
@@ -72,15 +103,20 @@ class Resolver : ExprVisitor, StmtVisitor
 
 	void visit(Return stmt)
 	{
+		import jlox.errors : error;
+
 		if (currentFunc == FunctionType.None)
 		{
-			import jlox.errors : error;
 
 			error(stmt.keyword, "Can't return from global scope");
 		}
 
 		if (stmt.value)
+		{
+			if (currentFunc == FunctionType.Init)
+				error(stmt.keyword, "Can't return a value from an initializer");
 			resolve(stmt.value);
+		}
 	}
 
 	void visit(Var stmt)
@@ -118,6 +154,11 @@ class Resolver : ExprVisitor, StmtVisitor
 			resolve(arg);
 	}
 
+	void visit(Get expr)
+	{
+		resolve(expr.object);
+	}
+
 	void visit(Grouping expr)
 	{
 		resolve(expr.expression);
@@ -132,6 +173,25 @@ class Resolver : ExprVisitor, StmtVisitor
 	{
 		resolve(expr.left);
 		resolve(expr.right);
+	}
+
+	void visit(Set expr)
+	{
+		resolve(expr.value);
+		resolve(expr.object);
+	}
+
+	void visit(This expr)
+	{
+		if (currentClass == ClassType.None)
+		{
+			import jlox.errors : error;
+
+			error(expr.keyword, "Can't use 'this' outside of a class");
+			return;
+		}
+
+		resolveLocal(expr, expr.keyword);
 	}
 
 	void visit(Unary expr)
@@ -217,11 +277,14 @@ private:
 
 	void resolveLocal(Expr expr, Token name)
 	{
-		foreach_reverse (idx, _scope; scopes)
+		import std.stdio;
+
+		for (long i = scopes.length - 1; i >= 0; --i)
 		{
-			if (name.lexeme in _scope)
+			if (name.lexeme in scopes[i])
 			{
-				interpreter.resolve(expr, idx.to!int);
+
+				interpreter.resolve(expr, (scopes.length - 1 - i).to!int);
 				return;
 			}
 		}

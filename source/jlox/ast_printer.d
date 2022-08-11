@@ -27,6 +27,11 @@ string printAST(Expr expr)
 			return "";
 		}
 
+		string visit(Get expr)
+		{
+			return "";
+		}
+
 		string visit(Grouping expr)
 		{
 			return parenthesize("group", expr.expression);
@@ -42,6 +47,16 @@ string printAST(Expr expr)
 		string visit(Logical expr)
 		{
 			return parenthesize(expr.operator.lexeme, expr.left, expr.right);
+		}
+
+		string visit(Set expr)
+		{
+			return "";
+		}
+
+		string visit(This expr)
+		{
+			return "";
 		}
 
 		string visit(Unary expr)

@@ -1,0 +1,113 @@
+class Breakfast {
+    cook() {
+        print "Eggs a-fryin'!";
+    }
+
+    serve(who) {
+        print "Enjoy your breakfast, " + who + ".";
+    }
+}
+
+print Breakfast;
+
+class DevonshireCream {
+  serveOn() {
+    return "Scones";
+  }
+}
+
+print DevonshireCream;
+var cream = DevonshireCream();
+print cream.serveOn();
+
+var creamServing = cream.serveOn;
+creamServing();
+
+class Bagel {}
+var bagel = Bagel();
+
+bagel.butter = "Dairy";
+
+print bagel;
+print bagel.butter;
+
+class Bacon {
+  eat() {
+    print "Crunch crunch crunch!";
+  }
+}
+
+Bacon().eat();
+
+class Box {}
+
+fun notMethod(argument) {
+  print "called function with " + argument;
+}
+
+var box = Box();
+box.function = notMethod;
+box.function("argument");
+
+class Person {
+  sayName() {
+    print this.name;
+  }
+}
+
+var jane = Person();
+jane.name = "Jane";
+
+var bill = Person();
+bill.name = "Bill";
+
+bill.sayName = jane.sayName;
+bill.sayName();
+
+var method = jane.sayName;
+method();
+
+class Egotist {
+  speak() {
+    print this;
+  }
+}
+
+var egoMethod = Egotist().speak;
+egoMethod();
+
+class Cake {
+  taste() {
+    var adjective = "delicious";
+    print "The " + this.flavor + " cake is " + adjective + "!";
+  }
+}
+
+var cake = Cake();
+cake.flavor = "German chocolate";
+cake.taste();
+
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      print this;
+    }
+
+    return localFunction;
+  }
+}
+
+var callback = Thing().getCallback();
+callback();
+
+// print this;
+
+class Foo {
+  init() {
+    // return "something else";
+    return;
+  }
+}
+
+var foo = Foo();
+print foo.init();

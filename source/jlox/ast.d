@@ -80,15 +80,19 @@ enum exprString = generateAST("Expr", [
 	"Assign   : Token name, Expr value",
 	"Binary   : Expr left, Token operator, Expr right",
 	"Call     : Expr callee, Token paren, Expr[] args",
+	"Get      : Expr object, Token name",
 	"Grouping : Expr expression",
 	"Literal  : Variant value",
 	"Logical  : Expr left, Token operator, Expr right",
+	"Set      : Expr object, Token name, Expr value",
+	"This     : Token keyword",
 	"Unary    : Token operator, Expr right",
 	"Variable : Token name",
 ]);
 
 enum stmtString = generateAST("Stmt", [
 	"Block      : Stmt[] statements",
+	"Class      : Token name, Function[] methods",
 	"Expression : Expr expression",
 	"Function   : Token name, Token[] params, Stmt[] body",
 	"If         : Expr condition, Stmt thenBranch, Stmt elseBranch",

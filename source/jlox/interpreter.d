@@ -3,9 +3,12 @@ module jlox.interpreter;
 import std.variant : Variant;
 
 import jlox.ast;
+import jlox.callable : Callable;
 import jlox.errors : RuntimeException;
 import jlox.env : Env;
-import jlox.lox_func : Callable;
+import jlox.lox_class;
+import jlox.lox_func : LoxFunc;
+import jlox.lox_inst : LoxInst;
 import jlox.token : Token;
 
 alias ExprVisitor = Expr.Visitor!Variant;
@@ -82,6 +85,22 @@ class Interpreter : ExprVisitor, StmtVisitor
 	void visit(Block stmt)
 	{
 		executeBlock(stmt.statements, new Env(env));
+	}
+
+	void visit(Class stmt)
+	{
+		import jlox.lox_class : LoxClass;
+
+		env.define(stmt.name.lexeme, Variant(null));
+
+		Methods methods;
+		foreach (method; stmt.methods)
+		{
+			methods[method.name.lexeme] = new LoxFunc(method, env, method.name.lexeme == "init");
+		}
+
+		LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+		env.assign(stmt.name, Variant(klass));
 	}
 
 	void visit(Expression stmt)
@@ -236,6 +255,17 @@ class Interpreter : ExprVisitor, StmtVisitor
 		return func.call(this, args);
 	}
 
+	Variant visit(Get expr)
+	{
+		Variant obj = evaluate(expr.object);
+		if (obj.convertsTo!LoxInst)
+		{
+			return obj.get!LoxInst.get(expr.name);
+		}
+
+		throw new RuntimeException(expr.name, "Only instances have properties");
+	}
+
 	Variant visit(Grouping expr)
 	{
 		return evaluate(expr.expression);
@@ -264,6 +294,23 @@ class Interpreter : ExprVisitor, StmtVisitor
 		}
 
 		return evaluate(expr.right);
+	}
+
+	Variant visit(Set expr)
+	{
+		Variant obj = evaluate(expr.object);
+
+		if (!obj.convertsTo!LoxInst)
+			throw new RuntimeException(expr.name, "Only instances have fields");
+
+		Variant value = evaluate(expr.value);
+		obj.get!LoxInst.set(expr.name, value);
+		return value;
+	}
+
+	Variant visit(This expr)
+	{
+		return lookUpVariable(expr.keyword, expr);
 	}
 
 	Variant visit(Unary expr)

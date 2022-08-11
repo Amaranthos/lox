@@ -3,24 +3,30 @@ module jlox.lox_func;
 import jlox.ast : Function;
 import jlox.env : Env;
 import jlox.interpreter : Interpreter;
+import jlox.lox_inst;
 
 import std.variant : Variant;
 
-interface Callable
-{
-	int arity();
-	Variant call(Interpreter interpreter, Variant[] args);
-}
+import jlox.callable;
 
 class LoxFunc : Callable
 {
 	private Function declaration;
 	private Env closure;
+	private bool isInitializer;
 
-	this(Function declaration, Env closure)
+	this(Function declaration, Env closure, bool isInitializer = false)
 	{
 		this.declaration = declaration;
 		this.closure = closure;
+		this.isInitializer = isInitializer;
+	}
+
+	LoxFunc bind(LoxInst inst)
+	{
+		Env env = new Env(closure);
+		env.define("this", Variant(inst));
+		return new LoxFunc(declaration, env, isInitializer);
 	}
 
 	override int arity()
@@ -46,8 +52,15 @@ class LoxFunc : Callable
 		}
 		catch (ReturnException returnValue)
 		{
+			if (isInitializer)
+				return closure.getAt(0, "this");
+
 			return returnValue.value;
 		}
+
+		if (isInitializer)
+			return closure.getAt(0, "this");
+
 		return Variant(null);
 	}
 

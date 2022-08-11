@@ -46,6 +46,8 @@ private:
 		{
 			with (Token.Type)
 			{
+				if (match(CLASS))
+					return classDeclaration();
 				if (match(FUN))
 					return funcDeclaration("function");
 				if (match(VAR))
@@ -58,6 +60,25 @@ private:
 			sync();
 			return null;
 		}
+	}
+
+	Stmt classDeclaration()
+	{
+		with (Token.Type)
+		{
+			Token name = consume(IDENTIFIER, "Expect class name");
+			consume(LEFT_BRACE, "Expect '{' before class body");
+
+			Function[] methods;
+			while (!check(RIGHT_BRACE) && !isAtEnd)
+			{
+				methods ~= funcDeclaration("method");
+			}
+
+			consume(RIGHT_BRACE, "Expect '}' after class body");
+			return new Class(name, methods);
+		}
+
 	}
 
 	Stmt varDeclaration()
@@ -270,6 +291,11 @@ private:
 					Token name = (cast(Variable) expr).name;
 					return new Assign(name, value);
 				}
+				else if (cast(Get) expr)
+				{
+					Get get = cast(Get) expr;
+					return new Set(get.object, get.name, value);
+				}
 
 				error(equals, "Invalid assignment target");
 			}
@@ -401,6 +427,11 @@ private:
 			{
 				if (match(LEFT_PAREN))
 					expr = finishCall(expr);
+				else if (match(DOT))
+				{
+					Token name = consume(IDENTIFIER, "Expect property name after '.'");
+					expr = new Get(expr, name);
+				}
 				else
 					break;
 			}
@@ -442,6 +473,7 @@ private:
 				if (match(NIL)) return new Literal(Variant(null));
 				if (match(NUMBER)) return new Literal(Variant(previous().literal.get!double));
 				if (match(STRING)) return new Literal(Variant(previous().literal.get!string));
+				if (match(THIS)) return new This(previous());
 				if (match(IDENTIFIER)) return new Variable(previous());
 				// dfmt on
 
