@@ -12,11 +12,13 @@ alias Methods = LoxFunc[string];
 class LoxClass : Callable
 {
 	string name;
+	private LoxClass superclass;
 	private Methods methods;
 
-	this(string name, Methods methods)
+	this(string name, LoxClass superclass, Methods methods)
 	{
 		this.name = name;
+		this.superclass = superclass;
 		this.methods = methods;
 	}
 
@@ -24,6 +26,9 @@ class LoxClass : Callable
 	{
 		if (name in methods)
 			return methods[name];
+
+		if (superclass)
+			return superclass.findMethod(name);
 
 		return null;
 	}

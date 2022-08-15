@@ -54,6 +54,11 @@ string printAST(Expr expr)
 			return "";
 		}
 
+		string visit(Super expr)
+		{
+			return "";
+		}
+
 		string visit(This expr)
 		{
 			return "";

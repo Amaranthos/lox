@@ -24,6 +24,7 @@ private enum ClassType
 {
 	None,
 	Class,
+	Subclass
 }
 
 class Resolver : ExprVisitor, StmtVisitor
@@ -61,6 +62,23 @@ class Resolver : ExprVisitor, StmtVisitor
 		declare(stmt.name);
 		define(stmt.name);
 
+		if (stmt.superclass)
+		{
+			if (stmt.name.lexeme == stmt.superclass.name.lexeme)
+			{
+				import jlox.errors : error;
+
+				error(stmt.superclass.name, "A class can't inherit from itself");
+			}
+			else
+			{
+				currentClass = ClassType.Subclass;
+				resolve(stmt.superclass);
+				beginScope();
+				scopes.back["super"] = true;
+			}
+		}
+
 		beginScope();
 		scopes.back["this"] = true;
 
@@ -71,6 +89,9 @@ class Resolver : ExprVisitor, StmtVisitor
 		}
 
 		endScope();
+
+		if (stmt.superclass)
+			endScope();
 
 		currentClass = enclosingClass;
 	}
@@ -179,6 +200,27 @@ class Resolver : ExprVisitor, StmtVisitor
 	{
 		resolve(expr.value);
 		resolve(expr.object);
+	}
+
+	void visit(Super expr)
+	{
+		import jlox.errors : error;
+
+		switch (currentClass) with (ClassType)
+		{
+		case Subclass:
+			break;
+
+		case None:
+			error(expr.keyword, "Can't use 'super' outside of a class");
+			break;
+
+		default:
+			error(expr.keyword, "Can't use 'super' in a class with no superclass");
+			break;
+		}
+
+		resolveLocal(expr, expr.keyword);
 	}
 
 	void visit(This expr)

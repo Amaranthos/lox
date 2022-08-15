@@ -91,7 +91,27 @@ class Interpreter : ExprVisitor, StmtVisitor
 	{
 		import jlox.lox_class : LoxClass;
 
+		LoxClass superclass;
+		if (stmt.superclass)
+		{
+			// auto variant = evaluate(stmt.superclass);
+			// if (!variant.convertsTo!LoxClass)
+			// 	throw new RuntimeException(stmt.superclass.name, "Superclass must be a class");
+			// superclass = variant.get!LoxClass;
+		}
+
 		env.define(stmt.name.lexeme, Variant(null));
+
+		if (stmt.superclass)
+		{
+			auto variant = evaluate(stmt.superclass);
+			if (!variant.convertsTo!LoxClass)
+				throw new RuntimeException(stmt.superclass.name, "Superclass must be a class");
+			superclass = variant.get!LoxClass;
+
+			env = new Env(env);
+			env.define("super", Variant(superclass));
+		}
 
 		Methods methods;
 		foreach (method; stmt.methods)
@@ -99,7 +119,11 @@ class Interpreter : ExprVisitor, StmtVisitor
 			methods[method.name.lexeme] = new LoxFunc(method, env, method.name.lexeme == "init");
 		}
 
-		LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+		LoxClass klass = new LoxClass(stmt.name.lexeme, superclass, methods);
+
+		if (superclass)
+			env = env.enclosing;
+
 		env.assign(stmt.name, Variant(klass));
 	}
 
@@ -306,6 +330,25 @@ class Interpreter : ExprVisitor, StmtVisitor
 		Variant value = evaluate(expr.value);
 		obj.get!LoxInst.set(expr.name, value);
 		return value;
+	}
+
+	Variant visit(Super expr)
+	{
+		int dist = locals[expr];
+		LoxClass superclass = env.getAt(dist, "super").get!LoxClass;
+		LoxInst object = env.getAt(dist - 1, "this").get!LoxInst;
+
+		LoxFunc method = superclass.findMethod(expr.method.lexeme);
+
+		if (method is null)
+		{
+			import std.format : format;
+
+			throw new RuntimeException(expr.method, expr.method.lexeme
+					.format!"Undefined property '%s'");
+		}
+
+		return Variant(method.bind(object));
 	}
 
 	Variant visit(This expr)

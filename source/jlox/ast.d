@@ -85,6 +85,7 @@ enum exprString = generateAST("Expr", [
 	"Literal  : Variant value",
 	"Logical  : Expr left, Token operator, Expr right",
 	"Set      : Expr object, Token name, Expr value",
+	"Super    : Token keyword, Token method",
 	"This     : Token keyword",
 	"Unary    : Token operator, Expr right",
 	"Variable : Token name",
@@ -92,7 +93,7 @@ enum exprString = generateAST("Expr", [
 
 enum stmtString = generateAST("Stmt", [
 	"Block      : Stmt[] statements",
-	"Class      : Token name, Function[] methods",
+	"Class      : Token name, Variable superclass, Function[] methods",
 	"Expression : Expr expression",
 	"Function   : Token name, Token[] params, Stmt[] body",
 	"If         : Expr condition, Stmt thenBranch, Stmt elseBranch",

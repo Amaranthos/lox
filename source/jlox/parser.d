@@ -67,6 +67,14 @@ private:
 		with (Token.Type)
 		{
 			Token name = consume(IDENTIFIER, "Expect class name");
+
+			Variable superclass;
+			if (match(LESS))
+			{
+				consume(IDENTIFIER, "Expect superclass name");
+				superclass = new Variable(previous());
+			}
+
 			consume(LEFT_BRACE, "Expect '{' before class body");
 
 			Function[] methods;
@@ -76,9 +84,8 @@ private:
 			}
 
 			consume(RIGHT_BRACE, "Expect '}' after class body");
-			return new Class(name, methods);
+			return new Class(name, superclass, methods);
 		}
-
 	}
 
 	Stmt varDeclaration()
@@ -468,14 +475,25 @@ private:
 			import std.variant : Variant;
 
 			// dfmt off
-				if (match(FALSE)) return new Literal(Variant(false));
-				if (match(TRUE)) return new Literal(Variant(true));
-				if (match(NIL)) return new Literal(Variant(null));
-				if (match(NUMBER)) return new Literal(Variant(previous().literal.get!double));
-				if (match(STRING)) return new Literal(Variant(previous().literal.get!string));
-				if (match(THIS)) return new This(previous());
-				if (match(IDENTIFIER)) return new Variable(previous());
-				// dfmt on
+			if (match(FALSE)) return new Literal(Variant(false));
+			if (match(TRUE)) return new Literal(Variant(true));
+			if (match(NIL)) return new Literal(Variant(null));
+			if (match(NUMBER)) return new Literal(Variant(previous().literal.get!double));
+			if (match(STRING)) return new Literal(Variant(previous().literal.get!string));
+			// dfmt on
+
+			if (match(SUPER))
+			{
+				Token keyword = previous();
+				consume(DOT, "Expect '.' after 'super'");
+				Token method = consume(IDENTIFIER, "Expect superclass method name");
+				return new Super(keyword, method);
+			}
+
+			// dfmt off
+			if (match(THIS)) return new This(previous());
+			if (match(IDENTIFIER)) return new Variable(previous());
+			// dfmt on
 
 			if (match(LEFT_PAREN))
 			{
