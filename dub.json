@@ -6,13 +6,16 @@
       "name": "jlox",
       "targetType": "executable",
       "mainSourceFile": "source/jlox/main.d",
-      "targetName": "jlox"
+      "targetName": "jlox",
+      "excludedSourceFiles": ["source/clox/*"]
     },
     {
       "name": "clox",
       "targetType": "executable",
       "mainSourceFile": "source/clox/main.d",
-      "targetName": "clox"
+      "targetName": "clox",
+      "excludedSourceFiles": ["source/jlox/*"],
+      "buildOptions": ["betterC"]
     }
   ]
 }

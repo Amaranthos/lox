@@ -20,6 +20,23 @@
       "cwd": "${workspaceFolder}",
       "program": "bin/jlox",
       "args": ["data/${fileBasename}"]
+    },
+    {
+      "type": "code-d",
+      "request": "launch",
+      "dubBuild": true,
+      "name": "Run clox: REPL",
+      "cwd": "${workspaceFolder}",
+      "program": "bin/clox"
+    },
+    {
+      "type": "code-d",
+      "request": "launch",
+      "dubBuild": true,
+      "name": "Run clox: [file]",
+      "cwd": "${workspaceFolder}",
+      "program": "bin/clox",
+      "args": ["data/${fileBasename}"]
     }
   ]
 }
