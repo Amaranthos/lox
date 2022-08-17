@@ -13,6 +13,16 @@ struct Array(T)
 		return ptr[i];
 	}
 
+	ref T opDollar()
+	{
+		return ptr[count];
+	}
+
+	void opOpAssign(string op : "~")(T elem)
+	{
+		write(elem);
+	}
+
 	void write(T elem)
 	{
 		if (capacity < count + 1)

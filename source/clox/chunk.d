@@ -48,7 +48,7 @@ struct Chunk
 	size_t addConstant(Value value)
 	out (; constants[constants.count - 1] == value)
 	{
-		constants.write(value);
+		constants ~= value;
 		return constants.count - 1;
 	}
 }
@@ -72,17 +72,25 @@ int disassemble(Chunk* chunk, int offset)
 		printf("%4d ", chunk.lines[offset]);
 
 	ubyte instr = chunk.code[offset];
-	switch (instr) with (Op)
+	final switch (cast(Op) instr) with (Op)
 	{
 	case CONSTANT:
 		return constInstr(CONSTANT.stringof, chunk, offset);
 
+	case ADD:
+		return simpleInstr(ADD.stringof, offset);
+	case SUBTRACT:
+		return simpleInstr(SUBTRACT.stringof, offset);
+	case MULTIPLY:
+		return simpleInstr(MULTIPLY.stringof, offset);
+	case DIVIDE:
+		return simpleInstr(DIVIDE.stringof, offset);
+
+	case NEGATE:
+		return simpleInstr(NEGATE.stringof, offset);
+
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);
-
-	default:
-		printf("Unknown opcode %d\n", instr);
-		return offset + 1;
 	}
 }
 
