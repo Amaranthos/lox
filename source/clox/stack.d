@@ -16,7 +16,7 @@ struct Stack(T)
 
 	void push(T value)
 	{
-		*back++ = value;
+		*(++back) = value;
 	}
 
 	T pop()

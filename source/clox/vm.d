@@ -23,6 +23,14 @@ struct VM
 
 	}
 
+	InterpretResult interpret(char* source)
+	{
+		import clox.compiler : compile;
+
+		compile(source);
+		return InterpretResult.OK;
+	}
+
 	InterpretResult interpret(Chunk* chunk)
 	{
 		this.chunk = chunk;
@@ -38,7 +46,7 @@ struct VM
 			debug (trace)
 			{
 				printf("          ");
-				for (Value* slot = stack.ptr; slot < stack.back; slot++)
+				for (Value* slot = stack.ptr; slot < stack.back; ++slot)
 				{
 					printf("[ ");
 					printValue(*slot);
@@ -83,7 +91,7 @@ struct VM
 pragma(inline):
 	ubyte READ_BYTE()
 	{
-		return *ip++;
+		return *(++ip);
 	}
 
 pragma(inline):
