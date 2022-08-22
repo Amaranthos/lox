@@ -256,7 +256,7 @@ bool isDigit(char c)
 struct Token
 {
 	Type type;
-	const char* start;
+	const(char)* start;
 	size_t length;
 	int line;
 

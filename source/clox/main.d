@@ -47,8 +47,8 @@ void repl(VM vm)
 			printf("\n");
 			break;
 		}
+		vm.interpret(line.ptr);
 	}
-	vm.interpret(line.ptr);
 }
 
 void runFile(VM vm, char* path)

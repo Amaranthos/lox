@@ -27,14 +27,17 @@ struct VM
 	{
 		import clox.compiler : compile;
 
-		compile(source);
-		return InterpretResult.OK;
-	}
+		Chunk chunk;
+		scope (exit)
+			chunk.free();
 
-	InterpretResult interpret(Chunk* chunk)
-	{
-		this.chunk = chunk;
-		this.ip = this.chunk.code;
+		if (!compile(source, &chunk))
+		{
+			return InterpretResult.COMPILE_ERROR;
+		}
+
+		this.chunk = &chunk;
+		this.ip = chunk.code;
 
 		return run();
 	}
