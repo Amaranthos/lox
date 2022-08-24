@@ -3,10 +3,17 @@ module clox.opcode;
 enum Op
 {
 	CONSTANT,
+	NIL,
+	TRUE,
+	FALSE,
+	EQUAL,
+	GREATER,
+	LESS,
 	ADD,
 	SUBTRACT,
 	MULTIPLY,
 	DIVIDE,
+	NOT,
 	NEGATE,
 	RETURN
 }

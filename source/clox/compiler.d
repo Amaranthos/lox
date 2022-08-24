@@ -143,6 +143,25 @@ void binary(Parser* parser)
 
 	switch (operatorType)
 	{
+	case Token.BANG_EQUAL:
+		parser.emitBytes(Op.EQUAL, Op.NOT);
+		break;
+	case Token.EQUAL_EQUAL:
+		parser.emitByte(Op.EQUAL);
+		break;
+	case Token.GREATER:
+		parser.emitByte(Op.GREATER);
+		break;
+	case Token.GREATER_EQUAL:
+		parser.emitBytes(Op.LESS, Op.NOT);
+		break;
+	case Token.LESS:
+		parser.emitByte(Op.LESS);
+		break;
+	case Token.LESS_EQUAL:
+		parser.emitBytes(Op.GREATER, Op.NOT);
+		break;
+
 	case Token.PLUS:
 		parser.emitByte(Op.ADD);
 		break;
@@ -170,7 +189,7 @@ void number(Parser* parser)
 {
 	import core.stdc.stdlib : strtod;
 
-	parser.emitConstant(strtod(parser.previous.start, null));
+	parser.emitConstant(Value.from(strtod(parser.previous.start, null)));
 }
 
 void unary(Parser* parser)
@@ -181,6 +200,9 @@ void unary(Parser* parser)
 
 	switch (operatorType)
 	{
+	case Token.BANG:
+		parser.emitByte(Op.NOT);
+		break;
 	case Token.MINUS:
 		parser.emitByte(Op.NEGATE);
 		break;

@@ -15,7 +15,7 @@ struct VM
 
 	void init()
 	{
-		stack.init();
+		stack.clear();
 	}
 
 	void free()
@@ -59,28 +59,58 @@ struct VM
 				disassemble(chunk, cast(int)(ip - chunk.code));
 			}
 
-			Op instr;
-			final switch (instr = cast(Op) READ_BYTE()) with (Op)
+			Op instr = cast(Op) READ_BYTE();
+			final switch (instr) with (Op)
 			{
 			case CONSTANT:
 				stack.push(READ_CONTSANT());
 				break;
+			case NIL:
+				stack.push(Value.nil);
+				break;
+			case TRUE:
+				stack.push(Value.from(true));
+				break;
+			case FALSE:
+				stack.push(Value.from(false));
+				break;
+
+			case EQUAL:
+				Value b = stack.pop();
+				Value a = stack.pop();
+				stack.push(Value.from(a.equals(b)));
+				break;
+			case GREATER:
+				mixin(BINARY_OP!'>');
+				break;
+			case LESS:
+				mixin(BINARY_OP!'<');
+				break;
 
 			case ADD:
-				BINARY_OP!'+'();
+				mixin(BINARY_OP!'+');
 				break;
 			case SUBTRACT:
-				BINARY_OP!'-'();
+				mixin(BINARY_OP!'-');
 				break;
 			case MULTIPLY:
-				BINARY_OP!'*'();
+				mixin(BINARY_OP!'*');
 				break;
 			case DIVIDE:
-				BINARY_OP!'/'();
+				mixin(BINARY_OP!'/');
+				break;
+
+			case NOT:
+				stack.push(Value.from(stack.pop().isFalsey));
 				break;
 
 			case NEGATE:
-				stack.push(-stack.pop());
+				if (!stack.peek(0).isNumber)
+				{
+					runtimeError("Operand must be a number");
+					return InterpretResult.RUNTIME_ERROR;
+				}
+				stack.push(Value.from(-stack.pop().asNumber));
 				break;
 
 			case RETURN:
@@ -91,10 +121,28 @@ struct VM
 		}
 	}
 
+	extern (C) void runtimeError(const char* format, ...)
+	{
+		import core.stdc.stdarg : va_end, va_list, va_start;
+		import core.stdc.stdio : fprintf, fputs, stderr, vfprintf;
+
+		va_list args;
+		va_start(args, format);
+		vfprintf(stderr, format, args);
+		va_end(args);
+		fputs("\n", stderr);
+
+		size_t instr = ip - chunk.code - 1;
+		int line = chunk.lines[instr];
+		fprintf(stderr, "[line %d] in script\n", line);
+
+		stack.clear();
+	}
+
 pragma(inline):
 	ubyte READ_BYTE()
 	{
-		return *(++ip);
+		return *(ip++);
 	}
 
 pragma(inline):
@@ -104,11 +152,21 @@ pragma(inline):
 	}
 
 pragma(inline):
-	void BINARY_OP(char op)()
+	template BINARY_OP(char op)
 	{
-		double b = stack.pop();
-		double a = stack.pop();
-		stack.push(mixin("a " ~ op ~ " b"));
+		enum BINARY_OP =
+			q{
+		if (!stack.peek(0).isNumber || !stack.peek(1).isNumber)
+		{
+			runtimeError("Operands must be numbers");
+			return InterpretResult.RUNTIME_ERROR;
+		}
+		
+		double b = stack.pop().asNumber;
+		double a = stack.pop().asNumber;
+		}
+			~
+			"stack.push(Value.from(a " ~ op ~ " b));";
 	}
 }
 

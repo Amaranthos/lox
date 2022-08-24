@@ -76,6 +76,19 @@ int disassemble(Chunk* chunk, int offset)
 	{
 	case CONSTANT:
 		return constInstr(CONSTANT.stringof, chunk, offset);
+	case NIL:
+		return simpleInstr(NIL.stringof, offset);
+	case TRUE:
+		return simpleInstr(TRUE.stringof, offset);
+	case FALSE:
+		return simpleInstr(FALSE.stringof, offset);
+
+	case EQUAL:
+		return simpleInstr(EQUAL.stringof, offset);
+	case GREATER:
+		return simpleInstr(GREATER.stringof, offset);
+	case LESS:
+		return simpleInstr(LESS.stringof, offset);
 
 	case ADD:
 		return simpleInstr(ADD.stringof, offset);
@@ -85,6 +98,9 @@ int disassemble(Chunk* chunk, int offset)
 		return simpleInstr(MULTIPLY.stringof, offset);
 	case DIVIDE:
 		return simpleInstr(DIVIDE.stringof, offset);
+
+	case NOT:
+		return simpleInstr(NOT.stringof, offset);
 
 	case NEGATE:
 		return simpleInstr(NEGATE.stringof, offset);

@@ -4,23 +4,31 @@ enum STACK_MAX = 256;
 
 struct Stack(T)
 {
-	T[STACK_MAX] stack;
+	T[STACK_MAX] stack = void;
 	T* back;
 
-	alias stack this;
-
-	void init()
+	void clear()
 	{
-		back = stack.ptr;
+		back = &stack[0];
+	}
+
+	T* ptr()
+	{
+		return &stack[0];
 	}
 
 	void push(T value)
 	{
-		*(++back) = value;
+		*(back++) = value;
 	}
 
 	T pop()
 	{
-		return *--back;
+		return *(--back);
+	}
+
+	T peek(int dist)
+	{
+		return back[-1 - dist];
 	}
 }

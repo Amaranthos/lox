@@ -22,10 +22,10 @@ else
 		switch (argc)
 		{
 		case 1:
-			repl(vm);
+			repl(&vm);
 			break;
 		case 2:
-			runFile(vm, argv[1]);
+			runFile(&vm, argv[1]);
 			break;
 		default:
 			fprintf(stderr, "Usage: clox [path]\n");
@@ -36,7 +36,7 @@ else
 	}
 }
 
-void repl(VM vm)
+void repl(VM* vm)
 {
 	char[1024] line;
 	while (true)
@@ -51,7 +51,7 @@ void repl(VM vm)
 	}
 }
 
-void runFile(VM vm, char* path)
+void runFile(VM* vm, char* path)
 {
 	char* source = path.readFile();
 	InterpretResult result = vm.interpret(source);

@@ -1,3 +1,7 @@
 {
-  "d.dubArchType": "aarch64"
+  "d.dubArchType": "aarch64",
+  "lldb.displayFormat": "auto",
+  "lldb.showDisassembly": "auto",
+  "lldb.dereferencePointers": false,
+  "lldb.consoleMode": "commands"
 }

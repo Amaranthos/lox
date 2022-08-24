@@ -190,9 +190,10 @@ struct Scanner
 
 	Token.Type checkKeyword(int start, int length, const char* rest, Token.Type type)
 	{
-		import core.stdc.string : memcpy;
+		import core.stdc.string : memcmp;
 
-		if (this.current - this.start == start + length && memcpy(this.start + start, rest, length) is null)
+		if (this.current - this.start == start + length
+			&& memcmp(this.start + start, rest, length) == 0)
 			return type;
 		return Token.IDENTIFIER;
 	}
