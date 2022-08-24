@@ -3,6 +3,8 @@ module clox.vm;
 import core.stdc.stdio;
 
 import clox.chunk;
+import clox.memory;
+import clox.obj;
 import clox.opcode;
 import clox.stack;
 import clox.value;
@@ -12,6 +14,7 @@ struct VM
 	Chunk* chunk;
 	ubyte* ip;
 	Stack!(Value) stack;
+	Obj* objects;
 
 	void init()
 	{
@@ -20,7 +23,18 @@ struct VM
 
 	void free()
 	{
+		freeObjects();
+	}
 
+	void freeObjects()
+	{
+		Obj* obj = objects;
+		while (obj)
+		{
+			Obj* next = obj.next;
+			obj.free();
+			obj = next;
+		}
 	}
 
 	InterpretResult interpret(char* source)
@@ -31,7 +45,7 @@ struct VM
 		scope (exit)
 			chunk.free();
 
-		if (!compile(source, &chunk))
+		if (!compile(&this, source, &chunk))
 		{
 			return InterpretResult.COMPILE_ERROR;
 		}
@@ -88,7 +102,23 @@ struct VM
 				break;
 
 			case ADD:
-				mixin(BINARY_OP!'+');
+				if (stack.peek(0).isString && stack.peek(1).isString)
+				{
+					concatenate();
+				}
+				else if (!stack.peek(0).isNumber || !stack.peek(1).isNumber)
+				{
+					double b = stack.pop().asNumber;
+					double a = stack.pop().asNumber;
+
+					stack.push(Value.from(a + b));
+				}
+				else
+				{
+					runtimeError("Operands must be twon numbers or two strings");
+					return InterpretResult.RUNTIME_ERROR;
+				}
+
 				break;
 			case SUBTRACT:
 				mixin(BINARY_OP!'-');
@@ -119,6 +149,23 @@ struct VM
 				return InterpretResult.OK;
 			}
 		}
+	}
+
+	void concatenate()
+	{
+		import core.stdc.string : memcpy;
+
+		ObjString* b = stack.pop().asString;
+		ObjString* a = stack.pop().asString;
+
+		size_t length = a.length + b.length;
+		char* chars = allocate!char(length + 1);
+
+		memcpy(chars, a.chars, a.length);
+		memcpy(chars + a.length, b.chars, b.length);
+		chars[length] = '\0';
+
+		stack.push(Value.from(takeString(&this, chars, length)));
 	}
 
 	extern (C) void runtimeError(const char* format, ...)

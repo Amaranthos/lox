@@ -27,3 +27,13 @@ void freeArr(T)(T* ptr, size_t size)
 {
 	reallocate(ptr, T.sizeof * size, 0);
 }
+
+T* allocate(T)(size_t count)
+{
+	return cast(T*) reallocate!T(null, 0, T.sizeof * count);
+}
+
+void free(T)(T* ptr)
+{
+	reallocate!T(ptr, T.sizeof, 0);
+}

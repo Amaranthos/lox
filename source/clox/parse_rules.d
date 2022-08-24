@@ -55,7 +55,7 @@ ParseRule[] rules = [
 	Token.Type.LESS:          ParseRule(null,      &binary, Precedence.COMP),
 	Token.Type.LESS_EQUAL:    ParseRule(null,      &binary, Precedence.COMP),
 	Token.Type.IDENTIFIER:    ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.STRING:        ParseRule(null,      null,    Precedence.NONE),
+	Token.Type.STRING:        ParseRule(&str,      null,    Precedence.NONE),
 	Token.Type.NUMBER:        ParseRule(&number,   null,    Precedence.NONE),
 	Token.Type.AND:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.CLASS:         ParseRule(null,      null,    Precedence.NONE),

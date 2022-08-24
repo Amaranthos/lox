@@ -3,15 +3,17 @@ module clox.compiler;
 import core.stdc.stdio : printf;
 
 import clox.chunk;
+import clox.obj;
 import clox.opcode;
 import clox.parse_rules;
 import clox.scanner;
 import clox.value;
+import clox.vm;
 
-bool compile(char* source, Chunk* chunk)
+bool compile(VM* vm, char* source, Chunk* chunk)
 {
 	Scanner scanner = Scanner(source, source, 1);
-	Parser parser = Parser(&scanner, chunk);
+	Parser parser = Parser(&scanner, vm, chunk);
 
 	parser.advance();
 	(&parser).expression();
@@ -25,6 +27,7 @@ bool compile(char* source, Chunk* chunk)
 struct Parser
 {
 	Scanner* scanner;
+	VM* vm;
 
 	Chunk* compilingChunk;
 
@@ -190,6 +193,11 @@ void number(Parser* parser)
 	import core.stdc.stdlib : strtod;
 
 	parser.emitConstant(Value.from(strtod(parser.previous.start, null)));
+}
+
+void str(Parser* parser)
+{
+	parser.emitConstant(Value.from(copyString(parser.vm, parser.previous.start + 1, parser.previous.length - 2)));
 }
 
 void unary(Parser* parser)

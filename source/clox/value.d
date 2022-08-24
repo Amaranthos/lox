@@ -1,5 +1,15 @@
 module clox.value;
 
+import clox.obj;
+
+enum ValueType
+{
+	BOOL,
+	NIL,
+	NUMBER,
+	OBJ
+}
+
 struct Value
 {
 	ValueType type;
@@ -8,9 +18,10 @@ struct Value
 	{
 		bool boolean;
 		double number;
+		Obj* obj;
 	}
 
-	bool equals(in Value b) const
+	bool equals(Value b)
 	{
 		if (type != b.type)
 			return false;
@@ -23,6 +34,13 @@ struct Value
 			return true;
 		case NUMBER:
 			return asNumber == b.asNumber;
+		case OBJ:
+			ObjString* aStr = asString;
+			ObjString* bStr = b.asString;
+
+			import core.stdc.string : memcmp;
+
+			return aStr.length == bStr.length && memcmp(aStr.chars, bStr.chars, aStr.length) == 0;
 		}
 	}
 
@@ -76,13 +94,48 @@ struct Value
 		return r;
 	}
 
-}
+	bool isObj() const
+	{
+		return type == ValueType.OBJ;
+	}
 
-enum ValueType
-{
-	BOOL,
-	NIL,
-	NUMBER
+	Obj* asObj()
+	in (isObj)
+	{
+		return obj;
+	}
+
+	ObjType objType() const
+	in (isObj)
+	{
+		return obj.type;
+	}
+
+	bool isObjType(ObjType type)
+	{
+		return isObj && asObj.type == type;
+	}
+
+	bool isString()
+	{
+		return isObjType(ObjType.STRING);
+	}
+
+	ObjString* asString()
+	{
+		return cast(ObjString*) asObj;
+	}
+
+	char* asCstring()
+	{
+		return asString.chars;
+	}
+
+	static Value from(Obj* value)
+	{
+		Value r = {type: ValueType.OBJ, obj: value};
+		return r;
+	}
 }
 
 void printValue(Value value)
@@ -99,6 +152,21 @@ void printValue(Value value)
 		break;
 	case NUMBER:
 		printf("%g", value.asNumber);
+		break;
+	case OBJ:
+		printObj(value);
+		break;
+	}
+}
+
+void printObj(Value value)
+{
+	import core.stdc.stdio : printf;
+
+	final switch (value.objType) with (ObjType)
+	{
+	case STRING:
+		printf("%s", value.asCstring);
 		break;
 	}
 }
