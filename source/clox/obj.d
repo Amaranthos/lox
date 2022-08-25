@@ -41,28 +41,55 @@ struct ObjString
 	Obj obj;
 	size_t length;
 	char* chars;
+	uint hash;
 }
 
 Obj* copyString(VM* vm, const char* chars, size_t length)
 {
 	import core.stdc.string : memcpy;
 
+	uint hash = chars.hash(length);
+	ObjString* interned = vm.strings.findString(chars, length, hash);
+	if (interned)
+		return interned;
+
 	char* heapChars = allocate!char(length + 1);
 	memcpy(heapChars, chars, length);
 	heapChars[length] = '\0';
 
-	return allocateString(vm, heapChars, length);
+	return allocateString(vm, heapChars, length, hash);
 }
 
 Obj* takeString(VM* vm, char* chars, size_t length)
 {
-	return allocateString(vm, chars, length);
+	uint hash = chars.hash(length);
+	ObjString* interned = vm.strings.findString(chars, length, hash);
+	if (interned)
+	{
+		freeArr(chars, length + 1);
+		return interned;
+	}
+
+	return allocateString(vm, chars, length, hash);
 }
 
-Obj* allocateString(VM* vm, char* chars, size_t length)
+Obj* allocateString(VM* vm, char* chars, size_t length, uint hash)
 {
 	ObjString* str = allocateObj!ObjString(vm, ObjType.STRING);
 	str.length = length;
 	str.chars = chars;
+	str.hash = hash;
+
 	return cast(Obj*) str;
+}
+
+uint hash(in char* chars, size_t length)
+{
+	uint hash = 2_166_136_261u;
+	foreach (idx; 0 .. length)
+	{
+		hash ^= chars[idx];
+		hash *= 16_777_619;
+	}
+	return hash;
 }

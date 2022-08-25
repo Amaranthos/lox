@@ -35,12 +35,7 @@ struct Value
 		case NUMBER:
 			return asNumber == b.asNumber;
 		case OBJ:
-			ObjString* aStr = asString;
-			ObjString* bStr = b.asString;
-
-			import core.stdc.string : memcmp;
-
-			return aStr.length == bStr.length && memcmp(aStr.chars, bStr.chars, aStr.length) == 0;
+			return asString == b.asString;
 		}
 	}
 

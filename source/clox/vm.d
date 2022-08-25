@@ -7,6 +7,7 @@ import clox.memory;
 import clox.obj;
 import clox.opcode;
 import clox.stack;
+import clox.table;
 import clox.value;
 
 struct VM
@@ -14,6 +15,7 @@ struct VM
 	Chunk* chunk;
 	ubyte* ip;
 	Stack!(Value) stack;
+	Table strings;
 	Obj* objects;
 
 	void init()
@@ -23,6 +25,7 @@ struct VM
 
 	void free()
 	{
+		strings.free();
 		freeObjects();
 	}
 
