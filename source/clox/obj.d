@@ -2,6 +2,7 @@ module clox.obj;
 
 import clox.memory;
 import clox.vm;
+import clox.value;
 
 enum ObjType
 {
@@ -51,7 +52,7 @@ Obj* copyString(VM* vm, const char* chars, size_t length)
 	uint hash = chars.hash(length);
 	ObjString* interned = vm.strings.findString(chars, length, hash);
 	if (interned)
-		return interned;
+		return cast(Obj*) interned;
 
 	char* heapChars = allocate!char(length + 1);
 	memcpy(heapChars, chars, length);
@@ -67,7 +68,7 @@ Obj* takeString(VM* vm, char* chars, size_t length)
 	if (interned)
 	{
 		freeArr(chars, length + 1);
-		return interned;
+		return cast(Obj*) interned;
 	}
 
 	return allocateString(vm, chars, length, hash);
@@ -79,6 +80,8 @@ Obj* allocateString(VM* vm, char* chars, size_t length, uint hash)
 	str.length = length;
 	str.chars = chars;
 	str.hash = hash;
+
+	vm.strings.set(str, Value.nil());
 
 	return cast(Obj*) str;
 }

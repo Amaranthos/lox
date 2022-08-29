@@ -117,7 +117,7 @@ struct Scanner
 			case '\n':
 				++line;
 				advance();
-				return;
+				break;
 
 			case '/':
 				if (peekNext() == '/')

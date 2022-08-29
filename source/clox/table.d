@@ -21,7 +21,7 @@ struct Table
 
 	void free()
 	{
-		freeArr!T(entries, capacity);
+		freeArr(entries, capacity);
 		this = Table.init;
 	}
 
@@ -29,13 +29,13 @@ struct Table
 	{
 		if (count + 1 > capacity * TABLE_MAX_LOAD)
 		{
-			adjustCapacity(capacity.calcCapacity);
+			adjustCapacity(&this, capacity.calcCapacity);
 		}
 
-		Entry* entry = findEntry(entries, capacity, key);
+		Entry* entry = findEntry(this.entries, this.capacity, key);
 		bool isNewKey = entry.key is null;
 		if (isNewKey && entry.value.isNil)
-			++entries.count;
+			++count;
 
 		entry.key = key;
 		entry.value = value;
@@ -78,33 +78,6 @@ struct Table
 		}
 	}
 
-	void adjustCapacity(size_t capacity)
-	{
-		Entry* entries = allocate!Entry(capacity);
-		foreach (ref entry; entries[0 .. capacity])
-		{
-			entry.key = null;
-			entry.value = Value.init;
-		}
-
-		this.count = 0;
-		foreach (ref entry; this.entries[0 .. this.capacity])
-		{
-			if (entry.key is null)
-				continue;
-
-			Entry* dest = findEntry(entries, capacity, entry.key);
-			dest.key = entry.key;
-			dest.value = entry.value;
-			++this.count;
-		}
-
-		freeArr(this.entries, this.capacity);
-
-		this.entries = entries;
-		this.capacity = capacity;
-	}
-
 	ObjString* findString(const char* chars, size_t length, uint hash)
 	{
 		import core.stdc.string : memcmp;
@@ -112,7 +85,8 @@ struct Table
 		if (count == 0)
 			return null;
 
-		for (uint idx = hash % capacity;; idx = (idx + 1) % capacity)
+		uint idx = hash % capacity;
+		while (true)
 		{
 			Entry* entry = &entries[idx];
 			if (entry.key is null)
@@ -124,6 +98,8 @@ struct Table
 			{
 				return entry.key;
 			}
+
+			idx = (idx + 1) % capacity;
 		}
 	}
 }
@@ -131,24 +107,47 @@ struct Table
 Entry* findEntry(Entry* entries, size_t capacity, ObjString* key)
 {
 	Entry* tombstone;
-	for (uint idx = key.hash % capacity;; idx = (idx + 1) % capacity)
+	uint idx = key.hash & (capacity - 1);
+	while (true)
 	{
 		Entry* entry = &entries[idx];
 		if (entry.key is null)
 		{
 			if (entry.value.isNil)
-			{
-				return tombstone !is null ? tombstone : entry;
-			}
-			else
-			{
-				if (tombstone is null)
-					tombstone = entry;
-			}
+				return tombstone ? tombstone : entry;
+			else if (tombstone is null)
+				tombstone = entry;
 		}
-		else if (entry.key = key)
-		{
+		else if (entry.key == key)
 			return entry;
-		}
+
+		idx = (idx + 1) & (capacity - 1);
 	}
+}
+
+void adjustCapacity(Table* table, size_t capacity)
+{
+	Entry* entries = allocate!Entry(capacity);
+	foreach (ref entry; entries[0 .. capacity])
+	{
+		entry.key = null;
+		entry.value = Value.nil;
+	}
+
+	table.count = 0;
+	foreach (ref entry; table.entries[0 .. table.capacity])
+	{
+		if (entry.key is null)
+			continue;
+
+		Entry* dest = findEntry(entries, capacity, entry.key);
+		dest.key = entry.key;
+		dest.value = entry.value;
+		++table.count;
+	}
+
+	freeArr(table.entries, table.capacity);
+
+	table.entries = entries;
+	table.capacity = capacity;
 }

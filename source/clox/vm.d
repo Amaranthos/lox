@@ -16,6 +16,7 @@ struct VM
 	ubyte* ip;
 	Stack!(Value) stack;
 	Table strings;
+	Table globals;
 	Obj* objects;
 
 	void init()
@@ -25,6 +26,7 @@ struct VM
 
 	void free()
 	{
+		globals.free();
 		strings.free();
 		freeObjects();
 	}
@@ -92,6 +94,35 @@ struct VM
 				stack.push(Value.from(false));
 				break;
 
+			case POP:
+				stack.pop();
+				break;
+
+			case GET_GLOBAL:
+				ObjString* name = READ_STRING();
+				Value value;
+				if (!globals.get(name, &value))
+				{
+					runtimeError("Undefined variable '%s", name.chars);
+					return InterpretResult.RUNTIME_ERROR;
+				}
+				stack.push(value);
+				break;
+			case DEFINE_GLOBAL:
+				ObjString* name = READ_STRING();
+				globals.set(name, stack.peek(0));
+				stack.pop();
+				break;
+			case SET_GLOBAL:
+				ObjString* name = READ_STRING();
+				if (globals.set(name, stack.peek(0)))
+				{
+					globals.remove(name);
+					runtimeError("Undefined variable '%s'", name.chars);
+					return InterpretResult.RUNTIME_ERROR;
+				}
+				break;
+
 			case EQUAL:
 				Value b = stack.pop();
 				Value a = stack.pop();
@@ -109,7 +140,7 @@ struct VM
 				{
 					concatenate();
 				}
-				else if (!stack.peek(0).isNumber || !stack.peek(1).isNumber)
+				else if (stack.peek(0).isNumber || stack.peek(1).isNumber)
 				{
 					double b = stack.pop().asNumber;
 					double a = stack.pop().asNumber;
@@ -118,7 +149,7 @@ struct VM
 				}
 				else
 				{
-					runtimeError("Operands must be twon numbers or two strings");
+					runtimeError("Operands must be two numbers or two strings");
 					return InterpretResult.RUNTIME_ERROR;
 				}
 
@@ -146,9 +177,12 @@ struct VM
 				stack.push(Value.from(-stack.pop().asNumber));
 				break;
 
-			case RETURN:
+			case PRINT:
 				printValue(stack.pop());
 				printf("\n");
+				break;
+
+			case RETURN:
 				return InterpretResult.OK;
 			}
 		}
@@ -199,6 +233,12 @@ pragma(inline):
 	Value READ_CONTSANT()
 	{
 		return chunk.constants[READ_BYTE()];
+	}
+
+pragma(inline):
+	ObjString* READ_STRING()
+	{
+		return chunk.constants[READ_BYTE()].asString;
 	}
 
 pragma(inline):

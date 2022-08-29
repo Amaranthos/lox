@@ -6,6 +6,10 @@ enum Op
 	NIL,
 	TRUE,
 	FALSE,
+	POP,
+	GET_GLOBAL,
+	DEFINE_GLOBAL,
+	SET_GLOBAL,
 	EQUAL,
 	GREATER,
 	LESS,
@@ -15,5 +19,6 @@ enum Op
 	DIVIDE,
 	NOT,
 	NEGATE,
+	PRINT,
 	RETURN
 }

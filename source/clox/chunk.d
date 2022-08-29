@@ -83,6 +83,16 @@ int disassemble(Chunk* chunk, int offset)
 	case FALSE:
 		return simpleInstr(FALSE.stringof, offset);
 
+	case POP:
+		return simpleInstr(POP.stringof, offset);
+
+	case GET_GLOBAL:
+		return constInstr(GET_GLOBAL.stringof, chunk, offset);
+	case DEFINE_GLOBAL:
+		return constInstr(DEFINE_GLOBAL.stringof, chunk, offset);
+	case SET_GLOBAL:
+		return constInstr(SET_GLOBAL.stringof, chunk, offset);
+
 	case EQUAL:
 		return simpleInstr(EQUAL.stringof, offset);
 	case GREATER:
@@ -104,6 +114,9 @@ int disassemble(Chunk* chunk, int offset)
 
 	case NEGATE:
 		return simpleInstr(NEGATE.stringof, offset);
+
+	case PRINT:
+		return simpleInstr(PRINT.stringof, offset);
 
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);

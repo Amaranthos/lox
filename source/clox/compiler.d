@@ -16,9 +16,10 @@ bool compile(VM* vm, char* source, Chunk* chunk)
 	Parser parser = Parser(&scanner, vm, chunk);
 
 	parser.advance();
-	(&parser).expression();
-	parser.consume(Token.EOF, "Expect end of expression");
-
+	while (!parser.match(Token.EOF))
+	{
+		declaration(&parser);
+	}
 	parser.end();
 
 	return !parser.hadError;
@@ -48,6 +49,19 @@ struct Parser
 		errorAtCurrent(msg);
 	}
 
+	bool match(Token.Type type)
+	{
+		if (!check(type))
+			return false;
+		advance();
+		return true;
+	}
+
+	bool check(Token.Type type)
+	{
+		return current.type == type;
+	}
+
 	void advance()
 	{
 		previous = current;
@@ -70,6 +84,22 @@ struct Parser
 			if (!hadError)
 				compilingChunk.disassemble("code");
 		}
+	}
+
+	ubyte parseVariable(const char* errorMsg)
+	{
+		consume(Token.IDENTIFIER, errorMsg);
+		return identifierConstant(&previous);
+	}
+
+	ubyte identifierConstant(Token* name)
+	{
+		return makeConstant(Value.from(copyString(vm, name.start, name.length)));
+	}
+
+	void defineVariable(ubyte global)
+	{
+		emitBytes(Op.DEFINE_GLOBAL, global);
 	}
 
 	void emitConstant(Value value)
@@ -138,7 +168,7 @@ struct Parser
 	}
 }
 
-void binary(Parser* parser)
+void binary(Parser* parser, bool _)
 {
 	Token.Type operatorType = parser.previous.type;
 	ParseRule* rule = getRule(operatorType);
@@ -182,25 +212,43 @@ void binary(Parser* parser)
 	}
 }
 
-void grouping(Parser* parser)
+void grouping(Parser* parser, bool _)
 {
 	expression(parser);
 	parser.consume(Token.RIGHT_PAREN, "Expect ')' after expression");
 }
 
-void number(Parser* parser)
+void number(Parser* parser, bool _)
 {
 	import core.stdc.stdlib : strtod;
 
 	parser.emitConstant(Value.from(strtod(parser.previous.start, null)));
 }
 
-void str(Parser* parser)
+void str(Parser* parser, bool _)
 {
 	parser.emitConstant(Value.from(copyString(parser.vm, parser.previous.start + 1, parser.previous.length - 2)));
 }
 
-void unary(Parser* parser)
+void namedVariable(Parser* parser, Token name, bool canAssign)
+{
+	ubyte arg = parser.identifierConstant(&name);
+
+	if (canAssign && parser.match(Token.EQUAL))
+	{
+		expression(parser);
+		parser.emitBytes(Op.SET_GLOBAL, arg);
+	}
+	else
+		parser.emitBytes(Op.GET_GLOBAL, arg);
+}
+
+void variable(Parser* parser, bool canAssign)
+{
+	namedVariable(parser, parser.previous, canAssign);
+}
+
+void unary(Parser* parser, bool _)
 {
 	Token.Type operatorType = parser.previous.type;
 
@@ -230,17 +278,98 @@ void parsePrecedence(Parser* parser, Precedence precedence)
 		return;
 	}
 
-	prefixRule(parser);
+	bool canAssign = precedence <= Precedence.ASSIGN;
+	prefixRule(parser, canAssign);
 
 	while (precedence <= getRule(parser.current.type).precedence)
 	{
 		parser.advance();
 		ParseFn infixRule = getRule(parser.previous.type).infix;
-		infixRule(parser);
+		infixRule(parser, canAssign);
+
+		if (canAssign && parser.match(Token.EQUAL))
+			parser.error("Invalid assignment target");
 	}
 }
 
 void expression(Parser* parser)
 {
 	parsePrecedence(parser, Precedence.ASSIGN);
+}
+
+void varDeclaration(Parser* parser)
+{
+	ubyte global = parser.parseVariable("Expect variable name");
+
+	if (parser.match(Token.EQUAL))
+		expression(parser);
+	else
+		parser.emitByte(Op.NIL);
+
+	parser.consume(Token.SEMICOLON, "Expect ';' after variable declaration");
+
+	parser.defineVariable(global);
+}
+
+void expressionStatement(Parser* parser)
+{
+	expression(parser);
+	parser.consume(Token.SEMICOLON, "Expect ';' after expression");
+	parser.emitByte(Op.POP);
+}
+
+void printStatement(Parser* parser)
+{
+	expression(parser);
+	parser.consume(Token.SEMICOLON, "Expect ';' after value");
+	parser.emitByte(Op.PRINT);
+}
+
+void declaration(Parser* parser)
+{
+	if (parser.match(Token.VAR))
+		varDeclaration(parser);
+	else
+		statement(parser);
+
+	if (parser.panicMode)
+		synchronize(parser);
+}
+
+void synchronize(Parser* parser)
+{
+	parser.panicMode = false;
+
+	while (parser.current.type != Token.EOF)
+	{
+		if (parser.previous.type == Token.SEMICOLON)
+			return;
+
+		switch (parser.current.type)
+		{
+		case Token.CLASS:
+		case Token.FUN:
+		case Token.VAR:
+		case Token.FOR:
+		case Token.IF:
+		case Token.WHILE:
+		case Token.PRINT:
+		case Token.RETURN:
+			return;
+
+		default:
+			{
+				// NOOP
+			}
+		}
+		parser.advance();
+	}
+}
+
+void statement(Parser* parser)
+{
+	if (parser.match(Token.PRINT))
+		printStatement(parser);
+	else
+		expressionStatement(parser);
 }

@@ -19,7 +19,7 @@ enum Precedence
 	PRIMARY
 }
 
-alias ParseFn = void function(Parser*);
+alias ParseFn = void function(Parser*, bool);
 
 struct ParseRule
 {
@@ -54,23 +54,23 @@ ParseRule[] rules = [
 	Token.Type.GREATER_EQUAL: ParseRule(null,      &binary, Precedence.COMP),
 	Token.Type.LESS:          ParseRule(null,      &binary, Precedence.COMP),
 	Token.Type.LESS_EQUAL:    ParseRule(null,      &binary, Precedence.COMP),
-	Token.Type.IDENTIFIER:    ParseRule(null,      null,    Precedence.NONE),
+	Token.Type.IDENTIFIER:    ParseRule(&variable, null,    Precedence.NONE),
 	Token.Type.STRING:        ParseRule(&str,      null,    Precedence.NONE),
 	Token.Type.NUMBER:        ParseRule(&number,   null,    Precedence.NONE),
 	Token.Type.AND:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.CLASS:         ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.ELSE:          ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.FALSE:         ParseRule((Parser* p) { p.emitByte(Op.FALSE); },  null,    Precedence.NONE),
+	Token.Type.FALSE:         ParseRule((Parser* p, bool _) { p.emitByte(Op.FALSE); },  null,    Precedence.NONE),
 	Token.Type.FOR:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.FUN:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.IF:            ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.NIL:           ParseRule((Parser* p) { p.emitByte(Op.NIL); },  null,    Precedence.NONE),
+	Token.Type.NIL:           ParseRule((Parser* p, bool _) { p.emitByte(Op.NIL); },  null,    Precedence.NONE),
 	Token.Type.OR:            ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.PRINT:         ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.RETURN:        ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.SUPER:         ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.THIS:          ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.TRUE:          ParseRule((Parser* p) { p.emitByte(Op.TRUE); },  null,    Precedence.NONE),
+	Token.Type.TRUE:          ParseRule((Parser* p, bool _) { p.emitByte(Op.TRUE); },  null,    Precedence.NONE),
 	Token.Type.VAR:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.WHILE:         ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.ERROR:         ParseRule(null,      null,    Precedence.NONE),

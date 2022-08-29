@@ -18,7 +18,7 @@
   "parsefn": {
     "scope": "d",
     "prefix": "parsefn",
-    "body": ["void $1(Parser* parser)", "{", "\t$2", "}"],
+    "body": ["void $1(Parser* parser${2:, bool _})", "{", "\t$3", "}"],
     "description": "Parse function"
   }
 }

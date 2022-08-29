@@ -54,7 +54,6 @@ void repl(VM* vm)
 void runFile(VM* vm, char* path)
 {
 	char* source = path.readFile();
-	InterpretResult result = vm.interpret(source);
 	scope (exit)
 	{
 		import core.stdc.stdlib : free;
@@ -62,7 +61,7 @@ void runFile(VM* vm, char* path)
 		free(source);
 	}
 
-	final switch (result) with (InterpretResult)
+	final switch (vm.interpret(source)) with (InterpretResult)
 	{
 	case OK:
 		break;
