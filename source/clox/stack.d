@@ -7,6 +7,8 @@ struct Stack(T)
 	T[STACK_MAX] stack = void;
 	T* back;
 
+	alias stack this;
+
 	void clear()
 	{
 		back = &stack[0];

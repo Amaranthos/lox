@@ -17,21 +17,6 @@ struct Token
 		this.line = line;
 	}
 
-	// string toString() const
-	// {
-	// 	import std.string : format;
-
-	// 	switch (type) with (Type)
-	// 	{
-	// 	case STRING:
-	// 		return format!"%s %s %s"(type, lexeme, literal.get!string);
-	// 	case NUMBER:
-	// 		return format!"%s %s %s"(type, lexeme, literal.get!double);
-	// 	default:
-	// 		return format!"%s %s"(type, lexeme);
-	// 	}
-	// }
-
 	enum Type
 	{
 		// Single-character tokens.

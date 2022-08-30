@@ -287,3 +287,12 @@ struct Token
 		// dfmt on
 	}
 }
+
+bool identifiersEqual(Token* a, Token* b)
+{
+	if (a.length != b.length)
+		return false;
+	import core.stdc.string : memcmp;
+
+	return memcmp(a.start, b.start, a.length) == 0;
+}

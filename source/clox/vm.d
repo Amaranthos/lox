@@ -98,6 +98,15 @@ struct VM
 				stack.pop();
 				break;
 
+			case GET_LOCAL:
+				ubyte slot = READ_BYTE();
+				stack.push(stack[slot]);
+				break;
+			case SET_LOCAL:
+				ubyte slot = READ_BYTE();
+				stack[slot] = stack.peek(0);
+				break;
+
 			case GET_GLOBAL:
 				ObjString* name = READ_STRING();
 				Value value;

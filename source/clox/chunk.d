@@ -86,6 +86,11 @@ int disassemble(Chunk* chunk, int offset)
 	case POP:
 		return simpleInstr(POP.stringof, offset);
 
+	case GET_LOCAL:
+		return byteInstr(GET_LOCAL.stringof, chunk, offset);
+	case SET_LOCAL:
+		return byteInstr(SET_LOCAL.stringof, chunk, offset);
+
 	case GET_GLOBAL:
 		return constInstr(GET_GLOBAL.stringof, chunk, offset);
 	case DEFINE_GLOBAL:
@@ -127,6 +132,13 @@ int simpleInstr(string name, int offset)
 {
 	printf("%s\n", name.ptr);
 	return offset + 1;
+}
+
+int byteInstr(string name, Chunk* chunk, int offset)
+{
+	ubyte slot = chunk.code[offset + 1];
+	printf("%-16s %4d\n", name.ptr, slot);
+	return offset + 2;
 }
 
 int constInstr(string name, Chunk* chunk, int offset)

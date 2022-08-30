@@ -13,7 +13,8 @@ import clox.vm;
 bool compile(VM* vm, char* source, Chunk* chunk)
 {
 	Scanner scanner = Scanner(source, source, 1);
-	Parser parser = Parser(&scanner, vm, chunk);
+	Compiler compiler = Compiler();
+	Parser parser = Parser(&compiler, &scanner, vm, chunk);
 
 	parser.advance();
 	while (!parser.match(Token.EOF))
@@ -25,8 +26,22 @@ bool compile(VM* vm, char* source, Chunk* chunk)
 	return !parser.hadError;
 }
 
+struct Compiler
+{
+	Local[ubyte.max + 1] locals;
+	size_t localCount;
+	size_t scopeDepth;
+}
+
+struct Local
+{
+	Token name;
+	size_t depth;
+}
+
 struct Parser
 {
+	Compiler* compiler;
 	Scanner* scanner;
 	VM* vm;
 
@@ -89,7 +104,28 @@ struct Parser
 	ubyte parseVariable(const char* errorMsg)
 	{
 		consume(Token.IDENTIFIER, errorMsg);
+
+		declareVariable();
+		if (compiler.scopeDepth > 0)
+			return 0;
+
 		return identifierConstant(&previous);
+	}
+
+	size_t resolveLocal(Token* name)
+	{
+		for (size_t i = compiler.localCount - 1; i >= 0; --i)
+		{
+			Local* local = &compiler.locals[i];
+			if (identifiersEqual(name, &local.name))
+			{
+				if (local.depth == -1)
+					error("Can't read local variable in its own initializer");
+				return i;
+			}
+		}
+
+		return -1;
 	}
 
 	ubyte identifierConstant(Token* name)
@@ -97,9 +133,52 @@ struct Parser
 		return makeConstant(Value.from(copyString(vm, name.start, name.length)));
 	}
 
+	void declareVariable()
+	{
+		if (compiler.scopeDepth == 0)
+			return;
+
+		Token* name = &previous;
+		for (long i = compiler.localCount - 1; i >= 0; --i)
+		{
+			Local* local = &compiler.locals[i];
+			if (local.depth != -1 && local.depth < compiler.scopeDepth)
+				break;
+
+			if (identifiersEqual(name, &local.name))
+				error("Already a variable with this name in this scope");
+		}
+
+		addLocal(*name);
+	}
+
+	void addLocal(Token name)
+	{
+		if (compiler.localCount == ubyte.max + 1)
+		{
+			error("Too many local variables in function");
+			return;
+		}
+
+		Local* local = &compiler.locals[compiler.localCount++];
+		local.name = name;
+		local.depth = -1;
+	}
+
 	void defineVariable(ubyte global)
 	{
+		if (compiler.scopeDepth > 0)
+		{
+			markInitialized();
+			return;
+		}
+
 		emitBytes(Op.DEFINE_GLOBAL, global);
+	}
+
+	void markInitialized()
+	{
+		compiler.locals[compiler.localCount - 1].depth = compiler.scopeDepth;
 	}
 
 	void emitConstant(Value value)
@@ -232,15 +311,27 @@ void str(Parser* parser, bool _)
 
 void namedVariable(Parser* parser, Token name, bool canAssign)
 {
-	ubyte arg = parser.identifierConstant(&name);
+	ubyte getOp, setOp;
+	size_t arg = parser.resolveLocal(&name);
+	if (arg != -1)
+	{
+		getOp = Op.GET_LOCAL;
+		setOp = Op.SET_LOCAL;
+	}
+	else
+	{
+		arg = parser.identifierConstant(&name);
+		getOp = Op.GET_GLOBAL;
+		setOp = Op.SET_GLOBAL;
+	}
 
 	if (canAssign && parser.match(Token.EQUAL))
 	{
 		expression(parser);
-		parser.emitBytes(Op.SET_GLOBAL, arg);
+		parser.emitBytes(getOp, cast(ubyte) arg);
 	}
 	else
-		parser.emitBytes(Op.GET_GLOBAL, arg);
+		parser.emitBytes(setOp, cast(ubyte) arg);
 }
 
 void variable(Parser* parser, bool canAssign)
@@ -295,6 +386,32 @@ void parsePrecedence(Parser* parser, Precedence precedence)
 void expression(Parser* parser)
 {
 	parsePrecedence(parser, Precedence.ASSIGN);
+}
+
+void block(Parser* parser)
+{
+	while (!parser.check(Token.RIGHT_BRACE) && !parser.check(Token.EOF))
+		declaration(parser);
+
+	parser.consume(Token.RIGHT_BRACE, "Expect '{' after block");
+}
+
+void beginScope(Parser* parser)
+{
+	++parser.compiler.scopeDepth;
+}
+
+void endScope(Parser* parser)
+{
+	Compiler* compiler = parser.compiler;
+	--compiler.scopeDepth;
+
+	while (compiler.localCount > 0 && compiler.locals[compiler.localCount - 1].depth > compiler
+		.scopeDepth)
+	{
+		parser.emitByte(Op.POP);
+		--compiler.localCount;
+	}
 }
 
 void varDeclaration(Parser* parser)
@@ -370,6 +487,12 @@ void statement(Parser* parser)
 {
 	if (parser.match(Token.PRINT))
 		printStatement(parser);
+	else if (parser.match(Token.LEFT_BRACE))
+	{
+		parser.beginScope();
+		block(parser);
+		parser.endScope();
+	}
 	else
 		expressionStatement(parser);
 }
