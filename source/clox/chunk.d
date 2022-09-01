@@ -123,6 +123,14 @@ int disassemble(Chunk* chunk, int offset)
 	case PRINT:
 		return simpleInstr(PRINT.stringof, offset);
 
+	case JUMP:
+		return jumpInstr(JUMP.stringof, 1, chunk, offset);
+	case JUMP_IF_FALSE:
+		return jumpInstr(JUMP_IF_FALSE.stringof, 1, chunk, offset);
+
+	case LOOP:
+		return jumpInstr(LOOP.stringof, -1, chunk, offset);
+
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);
 	}
@@ -139,6 +147,14 @@ int byteInstr(string name, Chunk* chunk, int offset)
 	ubyte slot = chunk.code[offset + 1];
 	printf("%-16s %4d\n", name.ptr, slot);
 	return offset + 2;
+}
+
+int jumpInstr(string name, int sign, Chunk* chunk, int offset)
+{
+	ushort jump = cast(ushort)(chunk.code[offset + 1] << 8);
+	jump |= chunk.code[offset + 2];
+	printf("%-16s %4d -> %d\n", name.ptr, offset, offset + 3 + sign * jump);
+	return offset + 3;
 }
 
 int constInstr(string name, Chunk* chunk, int offset)

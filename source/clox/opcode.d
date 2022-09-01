@@ -1,6 +1,6 @@
 module clox.opcode;
 
-enum Op
+enum Op : ubyte
 {
 	CONSTANT,
 	NIL,
@@ -22,5 +22,8 @@ enum Op
 	NOT,
 	NEGATE,
 	PRINT,
+	JUMP,
+	JUMP_IF_FALSE,
+	LOOP,
 	RETURN
 }

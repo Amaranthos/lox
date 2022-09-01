@@ -29,14 +29,14 @@ bool compile(VM* vm, char* source, Chunk* chunk)
 struct Compiler
 {
 	Local[ubyte.max + 1] locals;
-	size_t localCount;
-	size_t scopeDepth;
+	int localCount;
+	int scopeDepth;
 }
 
 struct Local
 {
 	Token name;
-	size_t depth;
+	int depth;
 }
 
 struct Parser
@@ -114,7 +114,7 @@ struct Parser
 
 	size_t resolveLocal(Token* name)
 	{
-		for (size_t i = compiler.localCount - 1; i >= 0; --i)
+		for (int i = compiler.localCount - 1; i >= 0; --i)
 		{
 			Local* local = &compiler.locals[i];
 			if (identifiersEqual(name, &local.name))
@@ -212,6 +212,36 @@ struct Parser
 	{
 		emitByte(b1);
 		emitByte(b2);
+	}
+
+	void emitLoop(int start)
+	{
+		emitByte(Op.LOOP);
+
+		int offset = cast(int) compilingChunk.count - start + 2;
+		if (offset > ushort.max)
+			error("Loop body too large");
+
+		emitByte((offset >> 8) & 0xff);
+		emitByte(offset & 0xff);
+	}
+
+	uint emitJump(ubyte instr)
+	{
+		emitByte(instr);
+		emitByte(0xff);
+		emitByte(0xff);
+		return cast(int) compilingChunk.count - 2;
+	}
+
+	void patchJump(int offset)
+	{
+		int jump = cast(int) compilingChunk.count - offset - 2;
+		if (jump > ushort.max)
+			error("Too much code to jump over");
+
+		compilingChunk.code[offset] = (jump >> 8) & 0xff;
+		compilingChunk.code[offset + 1] = jump & 0xff;
 	}
 
 	void error(const char* msg)
@@ -328,10 +358,10 @@ void namedVariable(Parser* parser, Token name, bool canAssign)
 	if (canAssign && parser.match(Token.EQUAL))
 	{
 		expression(parser);
-		parser.emitBytes(getOp, cast(ubyte) arg);
+		parser.emitBytes(setOp, cast(ubyte) arg);
 	}
 	else
-		parser.emitBytes(setOp, cast(ubyte) arg);
+		parser.emitBytes(getOp, cast(ubyte) arg);
 }
 
 void variable(Parser* parser, bool canAssign)
@@ -381,6 +411,26 @@ void parsePrecedence(Parser* parser, Precedence precedence)
 		if (canAssign && parser.match(Token.EQUAL))
 			parser.error("Invalid assignment target");
 	}
+}
+
+void and_(Parser* parser, bool canAssign)
+{
+	auto endJump = parser.emitJump(Op.JUMP_IF_FALSE);
+	parser.emitByte(Op.POP);
+	parsePrecedence(parser, Precedence.AND);
+	parser.patchJump(endJump);
+}
+
+void or_(Parser* parser, bool canAssign)
+{
+	auto elseJump = parser.emitJump(Op.JUMP_IF_FALSE);
+	auto endJump = parser.emitJump(Op.JUMP);
+
+	parser.patchJump(elseJump);
+	parser.emitByte(Op.POP);
+
+	parsePrecedence(parser, Precedence.OR);
+	parser.patchJump(endJump);
 }
 
 void expression(Parser* parser)
@@ -435,11 +485,95 @@ void expressionStatement(Parser* parser)
 	parser.emitByte(Op.POP);
 }
 
+void ifStatement(Parser* parser)
+{
+	parser.consume(Token.LEFT_PAREN, "Expect '(' after 'if'");
+	expression(parser);
+	parser.consume(Token.RIGHT_PAREN, "Expect ')' after condition expression");
+
+	auto thenJump = parser.emitJump(Op.JUMP_IF_FALSE);
+	parser.emitByte(Op.POP);
+	statement(parser);
+
+	auto elseJump = parser.emitJump(Op.JUMP);
+
+	parser.patchJump(thenJump);
+	parser.emitByte(Op.POP);
+
+	if (parser.match(Token.ELSE))
+		statement(parser);
+
+	parser.patchJump(elseJump);
+}
+
 void printStatement(Parser* parser)
 {
 	expression(parser);
 	parser.consume(Token.SEMICOLON, "Expect ';' after value");
 	parser.emitByte(Op.PRINT);
+}
+
+void whileStatement(Parser* parser)
+{
+	int loopStart = cast(int) parser.compilingChunk.count;
+	parser.consume(Token.LEFT_PAREN, "Expect '(' after 'while'");
+	expression(parser);
+	parser.consume(Token.RIGHT_PAREN, "Expect ')' after condition expression");
+
+	auto exitJump = parser.emitJump(Op.JUMP_IF_FALSE);
+	parser.emitByte(Op.POP);
+	statement(parser);
+	parser.emitLoop(loopStart);
+
+	parser.patchJump(exitJump);
+	parser.emitByte(Op.POP);
+}
+
+void forStatement(Parser* parser)
+{
+	beginScope(parser);
+	parser.consume(Token.LEFT_PAREN, "Expect '(' after 'for'");
+	if (parser.match(Token.SEMICOLON))
+	{
+		// NOOP
+	}
+	else if (parser.match(Token.VAR))
+		varDeclaration(parser);
+	else
+		expressionStatement(parser);
+
+	int loopStart = cast(int) parser.compilingChunk.count;
+	int exitJump = -1;
+	if (!parser.match(Token.SEMICOLON))
+	{
+		expression(parser);
+		parser.consume(Token.SEMICOLON, "Expect ';' after loop condition");
+		exitJump = parser.emitJump(Op.JUMP_IF_FALSE);
+		parser.emitByte(Op.POP);
+	}
+
+	if (!parser.match(Token.RIGHT_PAREN))
+	{
+		int bodyJump = parser.emitJump(Op.JUMP);
+		int incrStart = cast(int) parser.compilingChunk.count;
+		expression(parser);
+		parser.emitByte(Op.POP);
+		parser.consume(Token.RIGHT_PAREN, "Expect ')' after for clauses");
+		parser.emitLoop(loopStart);
+		loopStart = incrStart;
+		parser.patchJump(bodyJump);
+	}
+
+	statement(parser);
+	parser.emitLoop(loopStart);
+
+	if (exitJump != -1)
+	{
+		parser.patchJump(exitJump);
+		parser.emitByte(Op.POP);
+	}
+
+	endScope(parser);
 }
 
 void declaration(Parser* parser)
@@ -487,6 +621,12 @@ void statement(Parser* parser)
 {
 	if (parser.match(Token.PRINT))
 		printStatement(parser);
+	else if (parser.match(Token.IF))
+		ifStatement(parser);
+	else if (parser.match(Token.WHILE))
+		whileStatement(parser);
+	else if (parser.match(Token.FOR))
+		forStatement(parser);
 	else if (parser.match(Token.LEFT_BRACE))
 	{
 		parser.beginScope();

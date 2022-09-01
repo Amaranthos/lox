@@ -78,8 +78,7 @@ struct VM
 				disassemble(chunk, cast(int)(ip - chunk.code));
 			}
 
-			Op instr = cast(Op) READ_BYTE();
-			final switch (instr) with (Op)
+			final switch (READ_BYTE()) with (Op)
 			{
 			case CONSTANT:
 				stack.push(READ_CONTSANT());
@@ -145,6 +144,7 @@ struct VM
 				break;
 
 			case ADD:
+				const _a = 1;
 				if (stack.peek(0).isString && stack.peek(1).isString)
 				{
 					concatenate();
@@ -189,6 +189,21 @@ struct VM
 			case PRINT:
 				printValue(stack.pop());
 				printf("\n");
+				break;
+
+			case JUMP:
+				ushort offset = READ_SHORT();
+				ip += offset;
+				break;
+			case JUMP_IF_FALSE:
+				ushort offset = READ_SHORT();
+				if (stack.peek(0).isFalsey)
+					ip += offset;
+				break;
+
+			case LOOP:
+				ushort offset = READ_SHORT();
+				ip -= offset;
 				break;
 
 			case RETURN:
@@ -236,6 +251,13 @@ pragma(inline):
 	ubyte READ_BYTE()
 	{
 		return *(ip++);
+	}
+
+pragma(inline):
+	ushort READ_SHORT()
+	{
+		ip += 2;
+		return cast(ushort)((ip[-2] << 8) | ip[-1]);
 	}
 
 pragma(inline):
