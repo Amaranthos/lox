@@ -25,5 +25,6 @@ enum Op : ubyte
 	JUMP,
 	JUMP_IF_FALSE,
 	LOOP,
+	CALL,
 	RETURN
 }

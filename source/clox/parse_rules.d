@@ -35,7 +35,7 @@ ParseRule* getRule(Token.Type type)
 
 // dfmt off
 ParseRule[] rules = [
-	Token.Type.LEFT_PAREN:    ParseRule(&grouping, null,    Precedence.NONE),
+	Token.Type.LEFT_PAREN:    ParseRule(&grouping, &call,   Precedence.CALL),
 	Token.Type.RIGHT_PAREN:   ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.LEFT_BRACE:    ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.RIGHT_BRACE:   ParseRule(null,      null,    Precedence.NONE),

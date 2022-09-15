@@ -1,12 +1,15 @@
 module clox.obj;
 
+import clox.chunk;
 import clox.memory;
-import clox.vm;
 import clox.value;
+import clox.vm;
 
 enum ObjType
 {
-	STRING
+	FUNC,
+	NATIVE,
+	STRING,
 }
 
 struct Obj
@@ -18,11 +21,22 @@ struct Obj
 	{
 		final switch (type) with (ObjType)
 		{
+		case FUNC:
+			ObjFunc* func = cast(ObjFunc*)&this;
+			func.chunk.free();
+			clox.memory.free!ObjFunc(cast(ObjFunc*)&this);
+			break;
+
+		case NATIVE:
+			clox.memory.free!ObjNative(cast(ObjNative*)&this);
+			break;
+
 		case STRING:
 			ObjString* str = cast(ObjString*)&this;
 			freeArr(str.chars, str.length + 1);
 			clox.memory.free!ObjString(cast(ObjString*)&this);
 			break;
+
 		}
 	}
 }
@@ -95,4 +109,36 @@ uint hash(in char* chars, size_t length)
 		hash *= 16_777_619;
 	}
 	return hash;
+}
+
+struct ObjFunc
+{
+	Obj obj;
+	int arity;
+	Chunk chunk;
+	ObjString* name;
+}
+
+ObjFunc* allocateFunc(VM* vm)
+{
+	ObjFunc* func = allocateObj!ObjFunc(vm, ObjType.FUNC);
+	func.arity = 0;
+	func.name = null;
+	func.chunk = Chunk.init;
+	return func;
+}
+
+alias NativeFn = Value function(int, Value*);
+
+struct ObjNative
+{
+	Obj obj;
+	NativeFn func;
+}
+
+ObjNative* allocateNative(VM* vm, NativeFn func)
+{
+	ObjNative* native = allocateObj!ObjNative(vm, ObjType.NATIVE);
+	native.func = func;
+	return native;
 }

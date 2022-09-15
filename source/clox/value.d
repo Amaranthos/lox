@@ -100,6 +100,12 @@ struct Value
 		return obj;
 	}
 
+	static Value from(Obj* value)
+	{
+		Value r = {type: ValueType.OBJ, obj: value};
+		return r;
+	}
+
 	ObjType objType() const
 	in (isObj)
 	{
@@ -126,10 +132,24 @@ struct Value
 		return asString.chars;
 	}
 
-	static Value from(Obj* value)
+	bool isFunc()
 	{
-		Value r = {type: ValueType.OBJ, obj: value};
-		return r;
+		return isObjType(ObjType.FUNC);
+	}
+
+	ObjFunc* asFunc()
+	{
+		return cast(ObjFunc*) asObj;
+	}
+
+	bool isNative()
+	{
+		return isObjType(ObjType.NATIVE);
+	}
+
+	ObjNative* asNative()
+	{
+		return cast(ObjNative*) asObj;
 	}
 }
 
@@ -160,6 +180,19 @@ void printObj(Value value)
 
 	final switch (value.objType) with (ObjType)
 	{
+	case FUNC:
+		if (value.asFunc.name is null)
+		{
+			printf("<script>");
+			return;
+		}
+		printf("<fn %s>", value.asFunc.name.chars);
+		break;
+
+	case NATIVE:
+		printf("<native fn>");
+		break;
+
 	case STRING:
 		printf("%s", value.asCstring);
 		break;

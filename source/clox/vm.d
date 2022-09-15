@@ -10,10 +10,20 @@ import clox.stack;
 import clox.table;
 import clox.value;
 
+struct Callframe
+{
+	ObjFunc* func;
+	ubyte* ip;
+	Value* slots;
+}
+
+enum FRAMES_MAX = 64;
+
 struct VM
 {
-	Chunk* chunk;
-	ubyte* ip;
+	Callframe[FRAMES_MAX] frames;
+	byte frameCount;
+
 	Stack!(Value) stack;
 	Table strings;
 	Table globals;
@@ -22,6 +32,9 @@ struct VM
 	void init()
 	{
 		stack.clear();
+		frameCount = 0;
+
+		defineNative("clock", &clockNative);
 	}
 
 	void free()
@@ -46,23 +59,27 @@ struct VM
 	{
 		import clox.compiler : compile;
 
-		Chunk chunk;
-		scope (exit)
-			chunk.free();
-
-		if (!compile(&this, source, &chunk))
-		{
+		ObjFunc* func = compile(&this, source);
+		if (func is null)
 			return InterpretResult.COMPILE_ERROR;
-		}
 
-		this.chunk = &chunk;
-		this.ip = chunk.code;
+		stack.push(Value.from(cast(Obj*) func));
+		call(func, 0);
 
 		return run();
 	}
 
 	InterpretResult run()
 	{
+		Callframe* frame = &frames[frameCount - 1];
+
+		// dfmt off
+		ubyte READ_BYTE() { return (*frame.ip++); }
+		ushort READ_SHORT() { frame.ip += 2; return cast(ushort)((frame.ip[-2] << 8) | frame.ip[-1]); }
+		Value READ_CONSTANT() { return frame.func.chunk.constants[READ_BYTE()]; }
+		ObjString* READ_STRING() { return READ_CONSTANT().asString; }
+		// dfmt on
+
 		while (true)
 		{
 			debug (trace)
@@ -75,13 +92,13 @@ struct VM
 					printf(" ]");
 				}
 				printf("\n");
-				disassemble(chunk, cast(int)(ip - chunk.code));
+				disassemble(&frame.func.chunk, cast(int)(frame.ip - frame.func.chunk.code));
 			}
 
 			final switch (READ_BYTE()) with (Op)
 			{
 			case CONSTANT:
-				stack.push(READ_CONTSANT());
+				stack.push(READ_CONSTANT());
 				break;
 			case NIL:
 				stack.push(Value.nil);
@@ -99,11 +116,11 @@ struct VM
 
 			case GET_LOCAL:
 				ubyte slot = READ_BYTE();
-				stack.push(stack[slot]);
+				stack.push(frame.slots[slot]);
 				break;
 			case SET_LOCAL:
 				ubyte slot = READ_BYTE();
-				stack[slot] = stack.peek(0);
+				frame.slots[slot] = stack.peek(0);
 				break;
 
 			case GET_GLOBAL:
@@ -193,23 +210,85 @@ struct VM
 
 			case JUMP:
 				ushort offset = READ_SHORT();
-				ip += offset;
+				frame.ip += offset;
 				break;
 			case JUMP_IF_FALSE:
 				ushort offset = READ_SHORT();
 				if (stack.peek(0).isFalsey)
-					ip += offset;
+					frame.ip += offset;
 				break;
 
 			case LOOP:
 				ushort offset = READ_SHORT();
-				ip -= offset;
+				frame.ip -= offset;
+				break;
+
+			case CALL:
+				byte arity = READ_BYTE();
+				if (!callValue(stack.peek(arity), arity))
+					return InterpretResult.RUNTIME_ERROR;
+				frame = &frames[frameCount - 1];
 				break;
 
 			case RETURN:
-				return InterpretResult.OK;
+				Value result = stack.pop();
+				--frameCount;
+
+				if (frameCount == 0)
+				{
+					stack.pop();
+					return InterpretResult.OK;
+				}
+
+				stack.back = frame.slots;
+				stack.push(result);
+				frame = &frames[frameCount - 1];
+				break;
 			}
 		}
+	}
+
+	bool callValue(Value callee, ubyte arity)
+	{
+		if (callee.isObj)
+		{
+			switch (callee.objType) with (ObjType)
+			{
+			case FUNC:
+				return call(callee.asFunc, arity);
+			case NATIVE:
+				NativeFn native = callee.asNative.func;
+				Value result = native(arity, stack.back - arity);
+				stack.back -= arity + 1;
+				stack.push(result);
+				return true;
+			default:
+				break;
+			}
+		}
+		runtimeError("Can only call functions and classes");
+		return false;
+	}
+
+	bool call(ObjFunc* func, ubyte arity)
+	{
+		if (arity != func.arity)
+		{
+			runtimeError("Expected %d arguments but got %d", func.arity, arity);
+			return false;
+		}
+
+		if (frameCount == FRAMES_MAX)
+		{
+			runtimeError("Stack overflow");
+			return false;
+		}
+
+		Callframe* frame = &frames[frameCount++];
+		frame.func = func;
+		frame.ip = func.chunk.code;
+		frame.slots = stack.back - arity - 1;
+		return true;
 	}
 
 	void concatenate()
@@ -240,36 +319,32 @@ struct VM
 		va_end(args);
 		fputs("\n", stderr);
 
-		size_t instr = ip - chunk.code - 1;
-		int line = chunk.lines[instr];
-		fprintf(stderr, "[line %d] in script\n", line);
+		for (int i = frameCount - 1; i >= 0; --i)
+		{
+			Callframe* frame = &frames[i];
+			ObjFunc* func = frame.func;
+			size_t instr = frame.ip - func.chunk.code - 1;
+			fprintf(stderr, "[line %d] in ", func.chunk.lines[instr]);
+			if (func.name is null)
+			{
+				fprintf(stderr, "script\n");
+			}
+			else
+			{
+				fprintf(stderr, "%s()\n", func.name.chars);
+			}
+		}
 
 		stack.clear();
 	}
 
-pragma(inline):
-	ubyte READ_BYTE()
+	void defineNative(in string name, NativeFn func)
 	{
-		return *(ip++);
-	}
-
-pragma(inline):
-	ushort READ_SHORT()
-	{
-		ip += 2;
-		return cast(ushort)((ip[-2] << 8) | ip[-1]);
-	}
-
-pragma(inline):
-	Value READ_CONTSANT()
-	{
-		return chunk.constants[READ_BYTE()];
-	}
-
-pragma(inline):
-	ObjString* READ_STRING()
-	{
-		return chunk.constants[READ_BYTE()].asString;
+		stack.push(Value.from(copyString(&this, name.ptr, name.length)));
+		stack.push(Value.from(cast(Obj*) allocateNative(&this, func)));
+		globals.set(stack.ptr[0].asString, stack.ptr[1]);
+		stack.pop();
+		stack.pop();
 	}
 
 pragma(inline):
@@ -289,6 +364,13 @@ pragma(inline):
 			~
 			"stack.push(Value.from(a " ~ op ~ " b));";
 	}
+}
+
+Value clockNative(int arity, Value* args)
+{
+	import core.stdc.time : clock, CLOCKS_PER_SEC;
+
+	return Value.from(cast(double) clock() / CLOCKS_PER_SEC);
 }
 
 enum InterpretResult

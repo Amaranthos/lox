@@ -10,27 +10,64 @@ import clox.scanner;
 import clox.value;
 import clox.vm;
 
-bool compile(VM* vm, char* source, Chunk* chunk)
+Compiler* compiler;
+
+ObjFunc* compile(VM* vm, char* source)
 {
 	Scanner scanner = Scanner(source, source, 1);
-	Compiler compiler = Compiler();
-	Parser parser = Parser(&compiler, &scanner, vm, chunk);
+	Parser parser = Parser(&scanner, vm);
+
+	Compiler _compiler = Compiler(vm, &parser);
+	_compiler.init(FuncType.SCRIPT);
 
 	parser.advance();
 	while (!parser.match(Token.EOF))
 	{
 		declaration(&parser);
 	}
-	parser.end();
 
-	return !parser.hadError;
+	ObjFunc* func = parser.end();
+	return parser.hadError ? null : func;
+}
+
+enum FuncType
+{
+	FUNC,
+	SCRIPT
 }
 
 struct Compiler
 {
+	VM* vm;
+	Parser* parser;
+
+	Compiler* enclosing;
+	ObjFunc* func;
+	FuncType type;
+
 	Local[ubyte.max + 1] locals;
 	int localCount;
 	int scopeDepth;
+
+	void init(FuncType type)
+	{
+		enclosing = compiler;
+		func = null;
+		this.type = type;
+		localCount = 0;
+		scopeDepth = 0;
+
+		func = allocateFunc(vm);
+		compiler = &this;
+		if (this.type != FuncType.SCRIPT)
+			compiler.func.name = cast(ObjString*) copyString(vm, parser.previous.start, parser
+					.previous.length);
+
+		Local* local = &locals[localCount++];
+		local.depth = 0;
+		local.name.start = "";
+		local.name.length = 0;
+	}
 }
 
 struct Local
@@ -41,17 +78,19 @@ struct Local
 
 struct Parser
 {
-	Compiler* compiler;
 	Scanner* scanner;
 	VM* vm;
-
-	Chunk* compilingChunk;
 
 	Token current;
 	Token previous;
 
 	bool hadError;
 	bool panicMode;
+
+	Chunk* compilingChunk()
+	{
+		return &compiler.func.chunk;
+	}
 
 	void consume(Token.Type type, const char* msg)
 	{
@@ -90,15 +129,19 @@ struct Parser
 		}
 	}
 
-	void end()
+	ObjFunc* end()
 	{
 		emitReturn();
+		ObjFunc* func = compiler.func;
 
 		debug (print)
 		{
 			if (!hadError)
-				compilingChunk.disassemble("code");
+				compilingChunk.disassemble(func.name ? func.name.chars : "<script>");
 		}
+
+		compiler = compiler.enclosing;
+		return func;
 	}
 
 	ubyte parseVariable(const char* errorMsg)
@@ -176,8 +219,28 @@ struct Parser
 		emitBytes(Op.DEFINE_GLOBAL, global);
 	}
 
+	ubyte argumentList()
+	{
+		ubyte count = 0;
+		if (!check(Token.RIGHT_PAREN))
+		{
+			do
+			{
+				expression(&this);
+				if (count == 255)
+					error("Can't have more than 255 arguments");
+				++count;
+			}
+			while (match(Token.COMMA));
+		}
+		consume(Token.RIGHT_PAREN, "Expect ')' after arguments");
+		return count;
+	}
+
 	void markInitialized()
 	{
+		if (compiler.scopeDepth == 0)
+			return;
 		compiler.locals[compiler.localCount - 1].depth = compiler.scopeDepth;
 	}
 
@@ -200,6 +263,7 @@ struct Parser
 
 	void emitReturn()
 	{
+		emitByte(Op.NIL);
 		emitByte(Op.RETURN);
 	}
 
@@ -319,6 +383,12 @@ void binary(Parser* parser, bool _)
 	default:
 		return;
 	}
+}
+
+void call(Parser* parser, bool canAssign)
+{
+	ubyte argCount = parser.argumentList();
+	parser.emitBytes(Op.CALL, argCount);
 }
 
 void grouping(Parser* parser, bool _)
@@ -446,14 +516,43 @@ void block(Parser* parser)
 	parser.consume(Token.RIGHT_BRACE, "Expect '{' after block");
 }
 
-void beginScope(Parser* parser)
+void func(Parser* parser, FuncType type)
 {
-	++parser.compiler.scopeDepth;
+	Compiler compiler = Compiler(parser.vm, parser);
+	compiler.init(type);
+
+	beginScope();
+
+	parser.consume(Token.LEFT_PAREN, "Expect '(' after function name");
+	if (!parser.check(Token.RIGHT_PAREN))
+	{
+		do
+		{
+			++compiler.func.arity;
+			if (compiler.func.arity > 255)
+				parser.errorAtCurrent("Can't have more than 255 parameters");
+
+			ubyte constant = parser.parseVariable("Expect variable name");
+			parser.defineVariable(constant);
+		}
+		while (parser.match(Token.COMMA));
+	}
+
+	parser.consume(Token.RIGHT_PAREN, "Expect ')' after parameters");
+	parser.consume(Token.LEFT_BRACE, "Expect '{' before function body");
+	parser.block();
+
+	ObjFunc* func = parser.end();
+	parser.emitBytes(Op.CONSTANT, parser.makeConstant(Value.from(cast(Obj*) func)));
+}
+
+void beginScope()
+{
+	++compiler.scopeDepth;
 }
 
 void endScope(Parser* parser)
 {
-	Compiler* compiler = parser.compiler;
 	--compiler.scopeDepth;
 
 	while (compiler.localCount > 0 && compiler.locals[compiler.localCount - 1].depth > compiler
@@ -462,6 +561,14 @@ void endScope(Parser* parser)
 		parser.emitByte(Op.POP);
 		--compiler.localCount;
 	}
+}
+
+void funDeclaration(Parser* parser)
+{
+	ubyte global = parser.parseVariable("Expect function name");
+	parser.markInitialized();
+	parser.func(FuncType.FUNC);
+	parser.defineVariable(global);
 }
 
 void varDeclaration(Parser* parser)
@@ -513,6 +620,21 @@ void printStatement(Parser* parser)
 	parser.emitByte(Op.PRINT);
 }
 
+void returnStatement(Parser* parser)
+{
+	if (compiler.type == FuncType.SCRIPT)
+		parser.error("Can't return from global scope");
+
+	if (parser.match(Token.SEMICOLON))
+		parser.emitReturn();
+	else
+	{
+		expression(parser);
+		parser.consume(Token.SEMICOLON, "Exepect ';' after return value");
+		parser.emitByte(Op.RETURN);
+	}
+}
+
 void whileStatement(Parser* parser)
 {
 	int loopStart = cast(int) parser.compilingChunk.count;
@@ -531,7 +653,7 @@ void whileStatement(Parser* parser)
 
 void forStatement(Parser* parser)
 {
-	beginScope(parser);
+	beginScope();
 	parser.consume(Token.LEFT_PAREN, "Expect '(' after 'for'");
 	if (parser.match(Token.SEMICOLON))
 	{
@@ -578,7 +700,9 @@ void forStatement(Parser* parser)
 
 void declaration(Parser* parser)
 {
-	if (parser.match(Token.VAR))
+	if (parser.match(Token.FUN))
+		funDeclaration(parser);
+	else if (parser.match(Token.VAR))
 		varDeclaration(parser);
 	else
 		statement(parser);
@@ -623,13 +747,15 @@ void statement(Parser* parser)
 		printStatement(parser);
 	else if (parser.match(Token.IF))
 		ifStatement(parser);
+	else if (parser.match(Token.RETURN))
+		returnStatement(parser);
 	else if (parser.match(Token.WHILE))
 		whileStatement(parser);
 	else if (parser.match(Token.FOR))
 		forStatement(parser);
 	else if (parser.match(Token.LEFT_BRACE))
 	{
-		parser.beginScope();
+		beginScope();
 		block(parser);
 		parser.endScope();
 	}

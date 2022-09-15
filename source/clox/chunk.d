@@ -53,9 +53,9 @@ struct Chunk
 	}
 }
 
-void disassemble(Chunk* chunk, in string name)
+void disassemble(Chunk* chunk, in char* name)
 {
-	printf("== %s == \n", name.ptr);
+	printf("== %s == \n", name);
 
 	for (int offset = 0; offset < chunk.count; offset = disassemble(chunk, offset))
 	{
@@ -130,6 +130,9 @@ int disassemble(Chunk* chunk, int offset)
 
 	case LOOP:
 		return jumpInstr(LOOP.stringof, -1, chunk, offset);
+
+	case CALL:
+		return byteInstr(CALL.stringof, chunk, offset);
 
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);

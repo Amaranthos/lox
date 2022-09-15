@@ -16,7 +16,7 @@
       "targetName": "clox",
       "excludedSourceFiles": ["source/jlox/*"],
       "buildOptions": ["betterC"],
-      "debugVersions": ["_trace", "print"]
+      "debugVersions": ["trace", "print"]
     }
   ]
 }
