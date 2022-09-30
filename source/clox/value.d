@@ -151,6 +151,16 @@ struct Value
 	{
 		return cast(ObjNative*) asObj;
 	}
+
+	bool isClosure()
+	{
+		return isObjType(ObjType.CLOSURE);
+	}
+
+	ObjClosure* asClosure()
+	{
+		return cast(ObjClosure*) asObj;
+	}
 }
 
 void printValue(Value value)
@@ -180,13 +190,12 @@ void printObj(Value value)
 
 	final switch (value.objType) with (ObjType)
 	{
+	case CLOSURE:
+		printFunc(value.asClosure.func);
+		break;
+
 	case FUNC:
-		if (value.asFunc.name is null)
-		{
-			printf("<script>");
-			return;
-		}
-		printf("<fn %s>", value.asFunc.name.chars);
+		printFunc(value.asFunc);
 		break;
 
 	case NATIVE:
@@ -196,5 +205,21 @@ void printObj(Value value)
 	case STRING:
 		printf("%s", value.asCstring);
 		break;
+
+	case UPVALUE:
+		printf("upvalue");
+		break;
 	}
+}
+
+void printFunc(ObjFunc* func)
+{
+	import core.stdc.stdio : printf;
+
+	if (func.name is null)
+	{
+		printf("<script>");
+		return;
+	}
+	printf("<fn %s>", func.name.chars);
 }

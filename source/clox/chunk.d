@@ -4,6 +4,7 @@ import core.stdc.stdio : printf;
 
 import clox.array;
 import clox.memory;
+import clox.obj;
 import clox.opcode;
 import clox.value;
 
@@ -98,6 +99,11 @@ int disassemble(Chunk* chunk, int offset)
 	case SET_GLOBAL:
 		return constInstr(SET_GLOBAL.stringof, chunk, offset);
 
+	case GET_UPVALUE:
+		return byteInstr(GET_UPVALUE.stringof, chunk, offset);
+	case SET_UPVALUE:
+		return byteInstr(SET_UPVALUE.stringof, chunk, offset);
+
 	case EQUAL:
 		return simpleInstr(EQUAL.stringof, offset);
 	case GREATER:
@@ -133,6 +139,27 @@ int disassemble(Chunk* chunk, int offset)
 
 	case CALL:
 		return byteInstr(CALL.stringof, chunk, offset);
+	case CLOSURE:
+		++offset;
+		ubyte constant = chunk.code[offset++];
+		printf("%-16s %4d ", CLOSURE.stringof.ptr, constant);
+		printValue(chunk.constants[constant]);
+		printf("\n");
+
+		ObjFunc* func = chunk.constants[constant].asFunc;
+		foreach (_; 0 .. func.upvalueCount)
+		{
+			ubyte isLocal = chunk.code[offset++];
+			ubyte idx = chunk.code[offset++];
+			auto str = (isLocal ? "local" : "upvalue");
+
+			printf("%04d      |                     %*s %d\n", offset - 2, cast(int) str.length, str.ptr, idx);
+		}
+
+		return offset;
+
+	case CLOSE_UPVALUE:
+		return simpleInstr(CLOSE_UPVALUE.stringof, offset);
 
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);

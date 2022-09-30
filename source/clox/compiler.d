@@ -12,6 +12,8 @@ import clox.vm;
 
 Compiler* compiler;
 
+enum UBYTE_COUNT = ubyte.max + 1;
+
 ObjFunc* compile(VM* vm, char* source)
 {
 	Scanner scanner = Scanner(source, source, 1);
@@ -45,8 +47,9 @@ struct Compiler
 	ObjFunc* func;
 	FuncType type;
 
-	Local[ubyte.max + 1] locals;
+	Local[UBYTE_COUNT] locals;
 	int localCount;
+	Upvalue[UBYTE_COUNT] upvalues;
 	int scopeDepth;
 
 	void init(FuncType type)
@@ -74,6 +77,13 @@ struct Local
 {
 	Token name;
 	int depth;
+	bool isCaptured;
+}
+
+struct Upvalue
+{
+	ubyte idx;
+	bool isLocal;
 }
 
 struct Parser
@@ -155,7 +165,7 @@ struct Parser
 		return identifierConstant(&previous);
 	}
 
-	size_t resolveLocal(Token* name)
+	int resolveLocal(Compiler* compiler, Token* name)
 	{
 		for (int i = compiler.localCount - 1; i >= 0; --i)
 		{
@@ -169,6 +179,47 @@ struct Parser
 		}
 
 		return -1;
+	}
+
+	int resolveUpvalue(Compiler* compiler, Token* name)
+	{
+		if (compiler.enclosing is null)
+			return -1;
+
+		int local = resolveLocal(compiler.enclosing, name);
+		if (local != -1)
+		{
+			compiler.enclosing.locals[local].isCaptured = true;
+			return addUpvalue(compiler, cast(ubyte) local, true);
+		}
+
+		int upvalue = resolveUpvalue(compiler.enclosing, name);
+		if (upvalue != -1)
+			return addUpvalue(compiler, cast(ubyte) upvalue, false);
+
+		return -1;
+	}
+
+	int addUpvalue(Compiler* compiler, ubyte idx, bool isLocal)
+	{
+		int upvalueCount = compiler.func.upvalueCount;
+
+		for (int i = 0; i < upvalueCount; ++i)
+		{
+			Upvalue* upvalue = &compiler.upvalues[i];
+			if (upvalue.idx == idx && upvalue.isLocal == isLocal)
+				return cast(int) i;
+		}
+
+		if (upvalueCount == UBYTE_COUNT)
+		{
+			error("Too many closure variables in function");
+			return 0;
+		}
+
+		compiler.upvalues[upvalueCount] = Upvalue(idx, isLocal);
+
+		return compiler.func.upvalueCount++;
 	}
 
 	ubyte identifierConstant(Token* name)
@@ -206,6 +257,7 @@ struct Parser
 		Local* local = &compiler.locals[compiler.localCount++];
 		local.name = name;
 		local.depth = -1;
+		local.isCaptured = false;
 	}
 
 	void defineVariable(ubyte global)
@@ -412,11 +464,16 @@ void str(Parser* parser, bool _)
 void namedVariable(Parser* parser, Token name, bool canAssign)
 {
 	ubyte getOp, setOp;
-	size_t arg = parser.resolveLocal(&name);
+	int arg = parser.resolveLocal(compiler, &name);
 	if (arg != -1)
 	{
 		getOp = Op.GET_LOCAL;
 		setOp = Op.SET_LOCAL;
+	}
+	else if ((arg = parser.resolveUpvalue(compiler, &name)) != -1)
+	{
+		getOp = Op.GET_UPVALUE;
+		setOp = Op.SET_UPVALUE;
 	}
 	else
 	{
@@ -543,7 +600,13 @@ void func(Parser* parser, FuncType type)
 	parser.block();
 
 	ObjFunc* func = parser.end();
-	parser.emitBytes(Op.CONSTANT, parser.makeConstant(Value.from(cast(Obj*) func)));
+	parser.emitBytes(Op.CLOSURE, parser.makeConstant(Value.from(cast(Obj*) func)));
+
+	foreach (upvalue; compiler.upvalues[0 .. func.upvalueCount])
+	{
+		parser.emitByte(cast(ubyte) upvalue.isLocal);
+		parser.emitByte(upvalue.idx);
+	}
 }
 
 void beginScope()
@@ -558,7 +621,8 @@ void endScope(Parser* parser)
 	while (compiler.localCount > 0 && compiler.locals[compiler.localCount - 1].depth > compiler
 		.scopeDepth)
 	{
-		parser.emitByte(Op.POP);
+		parser.emitByte((compiler.locals[compiler.localCount - 1].isCaptured) ? Op.CLOSE_UPVALUE
+				: Op.POP);
 		--compiler.localCount;
 	}
 }

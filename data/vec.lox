@@ -1,0 +1,22 @@
+fun vec(x, y) {
+    fun obj(msg) {
+        fun add(rhs) {
+            return vec(x + rhs("x"), y + rhs("y"));
+        }
+
+        if (msg == "x") return x;
+        if (msg == "y") return y;
+        if (msg == "add") return add;
+
+        print "unknown msg: " + msg;
+    }
+
+    return obj;
+}
+
+var a = vec(1, 2);
+var b = vec(3, 4);
+// var c = a("add")(b);
+
+// print c("x");
+// print c("y");

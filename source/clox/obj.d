@@ -7,9 +7,11 @@ import clox.vm;
 
 enum ObjType
 {
+	CLOSURE,
 	FUNC,
 	NATIVE,
 	STRING,
+	UPVALUE
 }
 
 struct Obj
@@ -21,24 +23,40 @@ struct Obj
 	{
 		final switch (type) with (ObjType)
 		{
+		case CLOSURE:
+			ObjClosure* closure = cast(ObjClosure*)(&this);
+			freeObj!ObjClosure(&this);
+			freeArr!(ObjUpvalue*)(closure.upvalues, closure.upvalueCount);
+			break;
+
 		case FUNC:
 			ObjFunc* func = cast(ObjFunc*)&this;
 			func.chunk.free();
-			clox.memory.free!ObjFunc(cast(ObjFunc*)&this);
+			freeObj!ObjFunc(&this);
 			break;
 
 		case NATIVE:
-			clox.memory.free!ObjNative(cast(ObjNative*)&this);
+			freeObj!ObjNative(&this);
 			break;
 
 		case STRING:
 			ObjString* str = cast(ObjString*)&this;
 			freeArr(str.chars, str.length + 1);
-			clox.memory.free!ObjString(cast(ObjString*)&this);
+			freeObj!ObjString(&this);
 			break;
 
+		case UPVALUE:
+			freeObj!ObjUpvalue(&this);
+			break;
 		}
 	}
+}
+
+void freeObj(T)(Obj* ptr)
+{
+	import clox.memory : free;
+
+	free!T(cast(T*) ptr);
 }
 
 T* allocateObj(T)(VM* vm, ObjType type)
@@ -115,6 +133,7 @@ struct ObjFunc
 {
 	Obj obj;
 	int arity;
+	int upvalueCount;
 	Chunk chunk;
 	ObjString* name;
 }
@@ -123,6 +142,7 @@ ObjFunc* allocateFunc(VM* vm)
 {
 	ObjFunc* func = allocateObj!ObjFunc(vm, ObjType.FUNC);
 	func.arity = 0;
+	func.upvalueCount = 0;
 	func.name = null;
 	func.chunk = Chunk.init;
 	return func;
@@ -141,4 +161,42 @@ ObjNative* allocateNative(VM* vm, NativeFn func)
 	ObjNative* native = allocateObj!ObjNative(vm, ObjType.NATIVE);
 	native.func = func;
 	return native;
+}
+
+struct ObjClosure
+{
+	Obj obj;
+	ObjFunc* func;
+	ObjUpvalue** upvalues;
+	int upvalueCount;
+}
+
+ObjClosure* allocateClosure(VM* vm, ObjFunc* func)
+{
+	ObjUpvalue** upvalues = allocate!(ObjUpvalue*)(func.upvalueCount);
+	foreach (ref uv; upvalues[0 .. func.upvalueCount])
+		uv = null;
+
+	ObjClosure* closure = allocateObj!ObjClosure(vm, ObjType.CLOSURE);
+	closure.func = func;
+	closure.upvalues = upvalues;
+	closure.upvalueCount = func.upvalueCount;
+	return closure;
+}
+
+struct ObjUpvalue
+{
+	Obj obj;
+	Value* location;
+	Value closed;
+	ObjUpvalue* next;
+}
+
+ObjUpvalue* allocateUpvalue(VM* vm, Value* slot)
+{
+	ObjUpvalue* upvalue = allocateObj!ObjUpvalue(vm, ObjType.UPVALUE);
+	upvalue.closed = Value.nil;
+	upvalue.location = slot;
+	upvalue.next = null;
+	return upvalue;
 }

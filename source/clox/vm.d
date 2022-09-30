@@ -12,7 +12,7 @@ import clox.value;
 
 struct Callframe
 {
-	ObjFunc* func;
+	ObjClosure* closure;
 	ubyte* ip;
 	Value* slots;
 }
@@ -27,6 +27,7 @@ struct VM
 	Stack!(Value) stack;
 	Table strings;
 	Table globals;
+	ObjUpvalue* openUpvalues;
 	Obj* objects;
 
 	void init()
@@ -64,7 +65,10 @@ struct VM
 			return InterpretResult.COMPILE_ERROR;
 
 		stack.push(Value.from(cast(Obj*) func));
-		call(func, 0);
+		ObjClosure* closure = allocateClosure(&this, func);
+		stack.pop();
+		stack.push(Value.from(cast(Obj*) closure));
+		call(closure, 0);
 
 		return run();
 	}
@@ -76,7 +80,7 @@ struct VM
 		// dfmt off
 		ubyte READ_BYTE() { return (*frame.ip++); }
 		ushort READ_SHORT() { frame.ip += 2; return cast(ushort)((frame.ip[-2] << 8) | frame.ip[-1]); }
-		Value READ_CONSTANT() { return frame.func.chunk.constants[READ_BYTE()]; }
+		Value READ_CONSTANT() { return frame.closure.func.chunk.constants[READ_BYTE()]; }
 		ObjString* READ_STRING() { return READ_CONSTANT().asString; }
 		// dfmt on
 
@@ -92,7 +96,8 @@ struct VM
 					printf(" ]");
 				}
 				printf("\n");
-				disassemble(&frame.func.chunk, cast(int)(frame.ip - frame.func.chunk.code));
+				disassemble(&frame.closure.func.chunk, cast(int)(
+						frame.ip - frame.closure.func.chunk.code));
 			}
 
 			final switch (READ_BYTE()) with (Op)
@@ -128,7 +133,7 @@ struct VM
 				Value value;
 				if (!globals.get(name, &value))
 				{
-					runtimeError("Undefined variable '%s", name.chars);
+					runtimeError("Undefined variable '%s'", name.chars);
 					return InterpretResult.RUNTIME_ERROR;
 				}
 				stack.push(value);
@@ -146,6 +151,15 @@ struct VM
 					runtimeError("Undefined variable '%s'", name.chars);
 					return InterpretResult.RUNTIME_ERROR;
 				}
+				break;
+
+			case GET_UPVALUE:
+				ubyte slot = READ_BYTE();
+				stack.push(*frame.closure.upvalues[slot].location);
+				break;
+			case SET_UPVALUE:
+				ubyte slot = READ_BYTE();
+				*frame.closure.upvalues[slot].location = stack.peek(0);
 				break;
 
 			case EQUAL:
@@ -229,9 +243,28 @@ struct VM
 					return InterpretResult.RUNTIME_ERROR;
 				frame = &frames[frameCount - 1];
 				break;
+			case CLOSURE:
+				ObjFunc* func = READ_CONSTANT().asFunc();
+				ObjClosure* closure = allocateClosure(&this, func);
+				stack.push(Value.from(cast(Obj*) closure));
+
+				foreach (ref upvalue; closure.upvalues[0 .. closure.upvalueCount])
+				{
+					ubyte isLocal = READ_BYTE();
+					ubyte idx = READ_BYTE();
+					upvalue = isLocal ? captureUpvalue(frame.slots + idx)
+						: frame.closure.upvalues[idx];
+				}
+				break;
+
+			case CLOSE_UPVALUE:
+				closeUpvalues(stack.back - 1);
+				stack.pop();
+				break;
 
 			case RETURN:
 				Value result = stack.pop();
+				closeUpvalues(frame.slots);
 				--frameCount;
 
 				if (frameCount == 0)
@@ -254,8 +287,8 @@ struct VM
 		{
 			switch (callee.objType) with (ObjType)
 			{
-			case FUNC:
-				return call(callee.asFunc, arity);
+			case CLOSURE:
+				return call(callee.asClosure, arity);
 			case NATIVE:
 				NativeFn native = callee.asNative.func;
 				Value result = native(arity, stack.back - arity);
@@ -270,11 +303,49 @@ struct VM
 		return false;
 	}
 
-	bool call(ObjFunc* func, ubyte arity)
+	ObjUpvalue* captureUpvalue(Value* local)
 	{
-		if (arity != func.arity)
+		ObjUpvalue* prevUpvalue;
+		ObjUpvalue* upvalue = openUpvalues;
+
+		while (upvalue && upvalue.location > local)
 		{
-			runtimeError("Expected %d arguments but got %d", func.arity, arity);
+			prevUpvalue = upvalue;
+			upvalue = upvalue.next;
+		}
+
+		if (upvalue && upvalue.location == local)
+		{
+			return upvalue;
+		}
+
+		auto result = allocateUpvalue(&this, local);
+		result.next = upvalue;
+
+		if (prevUpvalue is null)
+			openUpvalues = result;
+		else
+			prevUpvalue.next = result;
+
+		return result;
+	}
+
+	void closeUpvalues(Value* last)
+	{
+		while (openUpvalues && openUpvalues.location >= last)
+		{
+			ObjUpvalue* upvalue = openUpvalues;
+			upvalue.closed = *upvalue.location;
+			upvalue.location = &upvalue.closed;
+			openUpvalues = upvalue.next;
+		}
+	}
+
+	bool call(ObjClosure* closure, ubyte arity)
+	{
+		if (arity != closure.func.arity)
+		{
+			runtimeError("Expected %d arguments but got %d", closure.func.arity, arity);
 			return false;
 		}
 
@@ -285,8 +356,8 @@ struct VM
 		}
 
 		Callframe* frame = &frames[frameCount++];
-		frame.func = func;
-		frame.ip = func.chunk.code;
+		frame.closure = closure;
+		frame.ip = closure.func.chunk.code;
 		frame.slots = stack.back - arity - 1;
 		return true;
 	}
@@ -322,7 +393,7 @@ struct VM
 		for (int i = frameCount - 1; i >= 0; --i)
 		{
 			Callframe* frame = &frames[i];
-			ObjFunc* func = frame.func;
+			ObjFunc* func = frame.closure.func;
 			size_t instr = frame.ip - func.chunk.code - 1;
 			fprintf(stderr, "[line %d] in ", func.chunk.lines[instr]);
 			if (func.name is null)
