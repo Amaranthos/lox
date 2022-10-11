@@ -7,6 +7,7 @@ import clox.memory;
 import clox.obj;
 import clox.opcode;
 import clox.value;
+import clox.vm;
 
 struct Chunk
 {
@@ -49,7 +50,9 @@ struct Chunk
 	size_t addConstant(Value value)
 	out (; constants[constants.count - 1] == value)
 	{
+		vm.stack.push(value);
 		constants ~= value;
+		vm.stack.pop();
 		return constants.count - 1;
 	}
 }
@@ -61,6 +64,8 @@ void disassemble(Chunk* chunk, in char* name)
 	for (int offset = 0; offset < chunk.count; offset = disassemble(chunk, offset))
 	{
 	}
+
+	printf("\n");
 }
 
 int disassemble(Chunk* chunk, int offset)

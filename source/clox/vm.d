@@ -10,6 +10,8 @@ import clox.stack;
 import clox.table;
 import clox.value;
 
+public VM* vm;
+
 struct Callframe
 {
 	ObjClosure* closure;
@@ -30,6 +32,13 @@ struct VM
 	ObjUpvalue* openUpvalues;
 	Obj* objects;
 
+	size_t bytesAllocated;
+	size_t nextGC = 1024 * 1024;
+
+	size_t grayCount;
+	size_t grayCap;
+	Obj** grayStack;
+
 	void init()
 	{
 		stack.clear();
@@ -43,6 +52,10 @@ struct VM
 		globals.free();
 		strings.free();
 		freeObjects();
+
+		import core.stdc.stdlib : free;
+
+		free(grayStack);
 	}
 
 	void freeObjects()
@@ -366,8 +379,8 @@ struct VM
 	{
 		import core.stdc.string : memcpy;
 
-		ObjString* b = stack.pop().asString;
-		ObjString* a = stack.pop().asString;
+		ObjString* b = stack.peek(0).asString;
+		ObjString* a = stack.peek(1).asString;
 
 		size_t length = a.length + b.length;
 		char* chars = allocate!char(length + 1);
@@ -376,7 +389,10 @@ struct VM
 		memcpy(chars + a.length, b.chars, b.length);
 		chars[length] = '\0';
 
-		stack.push(Value.from(takeString(&this, chars, length)));
+		Value value = Value.from(takeString(&this, chars, length));
+		stack.pop();
+		stack.pop();
+		stack.push(value);
 	}
 
 	extern (C) void runtimeError(const char* format, ...)

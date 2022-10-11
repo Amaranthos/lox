@@ -32,6 +32,18 @@ ObjFunc* compile(VM* vm, char* source)
 	return parser.hadError ? null : func;
 }
 
+void markCompilerRoots()
+{
+	import clox.memory : markObj;
+
+	Compiler* current = compiler;
+	while (current)
+	{
+		markObj(cast(Obj*) current.func);
+		current = current.enclosing;
+	}
+}
+
 enum FuncType
 {
 	FUNC,

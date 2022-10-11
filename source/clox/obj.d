@@ -5,7 +5,9 @@ import clox.memory;
 import clox.value;
 import clox.vm;
 
-enum ObjType
+import core.stdc.stdio : printf;
+
+enum ObjType : ushort
 {
 	CLOSURE,
 	FUNC,
@@ -16,11 +18,38 @@ enum ObjType
 
 struct Obj
 {
-	ObjType type;
-	Obj* next;
+	ulong header;
+
+	ObjType type() const
+	{
+		return cast(ObjType)((header >> 56) & 0xff);
+	}
+
+	bool isMarked() const
+	{
+		return cast(bool)((header >> 48) & 0x01);
+	}
+
+	void isMarked(bool b)
+	{
+		header = header & 0xff00ffffffffffff | (cast(ulong) b << 48);
+	}
+
+	Obj* next()
+	{
+		return cast(Obj*)((header >> 0) & 0x0000ffffffffffff);
+	}
+
+	void next(Obj* o)
+	{
+		header = header & 0xffff000000000000 | (cast(ulong) o);
+	}
 
 	void free()
 	{
+		debug (log_gc)
+			printf("%p free type %d\n", cast(void*)&this, type);
+
 		final switch (type) with (ObjType)
 		{
 		case CLOSURE:
@@ -62,9 +91,11 @@ void freeObj(T)(Obj* ptr)
 T* allocateObj(T)(VM* vm, ObjType type)
 {
 	Obj* obj = cast(Obj*) reallocate!T(null, 0, T.sizeof);
-	obj.type = type;
-	obj.next = vm.objects;
+	obj.header = cast(ulong) vm.objects | cast(ulong) type << 56;
 	vm.objects = obj;
+
+	debug (log_gc)
+		printf("%p allocate %zu for %d\n", cast(void*) obj, T.sizeof, type);
 
 	return cast(T*) obj;
 }
@@ -113,7 +144,9 @@ Obj* allocateString(VM* vm, char* chars, size_t length, uint hash)
 	str.chars = chars;
 	str.hash = hash;
 
+	vm.stack.push(Value.from(cast(Obj*) str));
 	vm.strings.set(str, Value.nil());
+	vm.stack.pop();
 
 	return cast(Obj*) str;
 }

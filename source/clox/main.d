@@ -14,18 +14,20 @@ else
 {
 	extern (C) int main(int argc, char** argv)
 	{
-		VM vm;
+		VM _;
+		vm = &_;
+
 		scope (exit)
-			vm.free();
-		vm.init();
+			_.free();
+		_.init();
 
 		switch (argc)
 		{
 		case 1:
-			repl(&vm);
+			repl(vm);
 			break;
 		case 2:
-			runFile(&vm, argv[1]);
+			runFile(vm, argv[1]);
 			break;
 		default:
 			fprintf(stderr, "Usage: clox [path]\n");
