@@ -40,7 +40,7 @@ ParseRule[] rules = [
 	Token.Type.LEFT_BRACE:    ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.RIGHT_BRACE:   ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.COMMA:         ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.DOT:           ParseRule(null,      null,    Precedence.NONE),
+	Token.Type.DOT:           ParseRule(null,      &dot,    Precedence.CALL),
 	Token.Type.MINUS:         ParseRule(&unary,    &binary, Precedence.TERM),
 	Token.Type.PLUS:          ParseRule(null,      &binary, Precedence.TERM),
 	Token.Type.SEMICOLON:     ParseRule(null,      null,    Precedence.NONE),

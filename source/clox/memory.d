@@ -117,7 +117,7 @@ void markValue(Value value)
 		markObj(value.asObj);
 }
 
-import clox.obj : ObjType, ObjFunc, ObjClosure;
+import clox.obj;
 
 void blackenObj(Obj* obj)
 {
@@ -130,6 +130,10 @@ void blackenObj(Obj* obj)
 
 	final switch (obj.type) with (ObjType)
 	{
+	case CLASS:
+		ObjClass* klass = cast(ObjClass*) obj;
+		markObj(cast(Obj*) klass.name);
+		break;
 	case CLOSURE:
 		ObjClosure* closure = cast(ObjClosure*) obj;
 		markObj(cast(Obj*) closure.func);
@@ -142,6 +146,11 @@ void blackenObj(Obj* obj)
 		ObjFunc* func = cast(ObjFunc*) obj;
 		markObj(cast(Obj*) func.name);
 		markArray(&func.chunk.constants);
+		break;
+	case INSTANCE:
+		ObjInstance* inst = cast(ObjInstance*) obj;
+		markObj(cast(Obj*) inst.klass);
+		markTable(&inst.fields);
 		break;
 	case UPVALUE:
 		markValue((cast(ObjUpvalue*) obj).closed);

@@ -161,6 +161,26 @@ struct Value
 	{
 		return cast(ObjClosure*) asObj;
 	}
+
+	bool isClass()
+	{
+		return isObjType(ObjType.CLASS);
+	}
+
+	ObjClass* asClass()
+	{
+		return cast(ObjClass*) asObj;
+	}
+
+	bool isInstance()
+	{
+		return isObjType(ObjType.INSTANCE);
+	}
+
+	ObjInstance* asInstance()
+	{
+		return cast(ObjInstance*) asObj;
+	}
 }
 
 void printValue(Value value)
@@ -190,12 +210,20 @@ void printObj(Value value)
 
 	final switch (value.objType) with (ObjType)
 	{
+	case CLASS:
+		printf("%s", value.asClass.name.chars);
+		break;
+
 	case CLOSURE:
 		printFunc(value.asClosure.func);
 		break;
 
 	case FUNC:
 		printFunc(value.asFunc);
+		break;
+
+	case INSTANCE:
+		printf("%s instance", value.asInstance.klass.name.chars);
 		break;
 
 	case NATIVE:

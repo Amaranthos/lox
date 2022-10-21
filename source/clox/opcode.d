@@ -14,6 +14,8 @@ enum Op : ubyte
 	SET_GLOBAL,
 	GET_UPVALUE,
 	SET_UPVALUE,
+	GET_PROP,
+	SET_PROP,
 	EQUAL,
 	GREATER,
 	LESS,
@@ -30,5 +32,6 @@ enum Op : ubyte
 	CALL,
 	CLOSURE,
 	CLOSE_UPVALUE,
-	RETURN
+	RETURN,
+	CLASS
 }

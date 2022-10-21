@@ -109,6 +109,11 @@ int disassemble(Chunk* chunk, int offset)
 	case SET_UPVALUE:
 		return byteInstr(SET_UPVALUE.stringof, chunk, offset);
 
+	case GET_PROP:
+		return byteInstr(GET_PROP.stringof, chunk, offset);
+	case SET_PROP:
+		return byteInstr(SET_PROP.stringof, chunk, offset);
+
 	case EQUAL:
 		return simpleInstr(EQUAL.stringof, offset);
 	case GREATER:
@@ -168,6 +173,9 @@ int disassemble(Chunk* chunk, int offset)
 
 	case RETURN:
 		return simpleInstr(RETURN.stringof, offset);
+
+	case CLASS:
+		return constInstr(CLASS.stringof, chunk, offset);
 	}
 }
 

@@ -9,11 +9,13 @@ import core.stdc.stdio : printf;
 
 enum ObjType : ushort
 {
+	CLASS,
 	CLOSURE,
 	FUNC,
+	INSTANCE,
 	NATIVE,
 	STRING,
-	UPVALUE
+	UPVALUE,
 }
 
 struct Obj
@@ -52,6 +54,10 @@ struct Obj
 
 		final switch (type) with (ObjType)
 		{
+		case CLASS:
+			freeObj!ObjClass(&this);
+			break;
+
 		case CLOSURE:
 			ObjClosure* closure = cast(ObjClosure*)(&this);
 			freeObj!ObjClosure(&this);
@@ -62,6 +68,12 @@ struct Obj
 			ObjFunc* func = cast(ObjFunc*)&this;
 			func.chunk.free();
 			freeObj!ObjFunc(&this);
+			break;
+
+		case INSTANCE:
+			ObjInstance* inst = cast(ObjInstance*)(&this);
+			inst.fields.free();
+			freeObj!ObjInstance(&this);
 			break;
 
 		case NATIVE:
@@ -232,4 +244,35 @@ ObjUpvalue* allocateUpvalue(VM* vm, Value* slot)
 	upvalue.location = slot;
 	upvalue.next = null;
 	return upvalue;
+}
+
+struct ObjClass
+{
+	Obj obj;
+	ObjString* name;
+}
+
+ObjClass* allocateClass(VM* vm, ObjString* name)
+{
+	ObjClass* klass = allocateObj!ObjClass(vm, ObjType.CLASS);
+	klass.name = name;
+
+	return klass;
+}
+
+import clox.table;
+
+struct ObjInstance
+{
+	Obj obj;
+	ObjClass* klass;
+	Table fields;
+}
+
+ObjInstance* allocateInstance(VM* vm, ObjClass* klass)
+{
+	ObjInstance* inst = allocateObj!ObjInstance(vm, ObjType.INSTANCE);
+	inst.klass = klass;
+	inst.fields = Table();
+	return inst;
 }

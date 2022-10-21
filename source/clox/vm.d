@@ -175,6 +175,40 @@ struct VM
 				*frame.closure.upvalues[slot].location = stack.peek(0);
 				break;
 
+			case GET_PROP:
+				if (!stack.peek(0).isInstance)
+				{
+					runtimeError("Only instances have properties");
+					return InterpretResult.RUNTIME_ERROR;
+				}
+
+				ObjInstance* inst = stack.peek(0).asInstance();
+				ObjString* name = READ_STRING();
+
+				Value value;
+				if (inst.fields.get(name, &value))
+				{
+					stack.pop();
+					stack.push(value);
+					break;
+				}
+
+				runtimeError("Undefined property '%s", name.chars);
+				return InterpretResult.RUNTIME_ERROR;
+			case SET_PROP:
+				if (!stack.peek(1).isInstance)
+				{
+					runtimeError("Only instances have fields");
+					return InterpretResult.RUNTIME_ERROR;
+				}
+
+				ObjInstance* inst = stack.peek(1).asInstance();
+				inst.fields.set(READ_STRING(), stack.peek(0));
+				Value value = stack.pop();
+				stack.pop();
+				stack.push(value);
+				break;
+
 			case EQUAL:
 				Value b = stack.pop();
 				Value a = stack.pop();
@@ -290,6 +324,10 @@ struct VM
 				stack.push(result);
 				frame = &frames[frameCount - 1];
 				break;
+
+			case CLASS:
+				stack.push(Value.from(cast(Obj*) allocateClass(vm, READ_STRING())));
+				break;
 			}
 		}
 	}
@@ -300,6 +338,10 @@ struct VM
 		{
 			switch (callee.objType) with (ObjType)
 			{
+			case CLASS:
+				ObjClass* klass = callee.asClass;
+				vm.stack.back[-arity - 1] = Value.from(cast(Obj*) allocateInstance(vm, klass));
+				return true;
 			case CLOSURE:
 				return call(callee.asClosure, arity);
 			case NATIVE:

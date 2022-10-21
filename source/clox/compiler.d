@@ -455,6 +455,22 @@ void call(Parser* parser, bool canAssign)
 	parser.emitBytes(Op.CALL, argCount);
 }
 
+void dot(Parser* parser, bool canAssign)
+{
+	parser.consume(Token.IDENTIFIER, "Expect property name after '.'");
+	ubyte name = parser.identifierConstant(&parser.previous);
+
+	if (canAssign && parser.match(Token.EQUAL))
+	{
+		expression(parser);
+		parser.emitBytes(Op.SET_PROP, name);
+	}
+	else
+	{
+		parser.emitBytes(Op.GET_PROP, name);
+	}
+}
+
 void grouping(Parser* parser, bool _)
 {
 	expression(parser);
@@ -621,6 +637,20 @@ void func(Parser* parser, FuncType type)
 	}
 }
 
+void classDeclaration(Parser* parser)
+{
+	parser.consume(Token.IDENTIFIER, "Expect class name");
+	ubyte nameConstant = parser.identifierConstant(&parser.previous);
+	parser.declareVariable();
+
+	parser.emitBytes(Op.CLASS, nameConstant);
+	parser.defineVariable(nameConstant);
+
+	parser.consume(Token.LEFT_BRACE, "Expect '{' before class body");
+
+	parser.consume(Token.RIGHT_BRACE, "Expect '}' after class body");
+}
+
 void beginScope()
 {
 	++compiler.scopeDepth;
@@ -776,7 +806,9 @@ void forStatement(Parser* parser)
 
 void declaration(Parser* parser)
 {
-	if (parser.match(Token.FUN))
+	if (parser.match(Token.CLASS))
+		classDeclaration(parser);
+	else if (parser.match(Token.FUN))
 		funDeclaration(parser);
 	else if (parser.match(Token.VAR))
 		varDeclaration(parser);
