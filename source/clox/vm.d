@@ -31,6 +31,7 @@ struct VM
 	Table globals;
 	ObjUpvalue* openUpvalues;
 	Obj* objects;
+	ObjString* initString;
 
 	size_t bytesAllocated;
 	size_t nextGC = 1024 * 1024;
@@ -44,6 +45,9 @@ struct VM
 		stack.clear();
 		frameCount = 0;
 
+		initString = null;
+		initString = cast(ObjString*) copyString(&this, "init", 4);
+
 		defineNative("clock", &clockNative);
 	}
 
@@ -55,6 +59,7 @@ struct VM
 
 		import core.stdc.stdlib : free;
 
+		initString = null;
 		free(grayStack);
 	}
 
@@ -193,8 +198,10 @@ struct VM
 					break;
 				}
 
-				runtimeError("Undefined property '%s", name.chars);
-				return InterpretResult.RUNTIME_ERROR;
+				if (!bindMethod(inst.klass, name))
+					return InterpretResult.RUNTIME_ERROR;
+				break;
+
 			case SET_PROP:
 				if (!stack.peek(1).isInstance)
 				{
@@ -290,6 +297,13 @@ struct VM
 					return InterpretResult.RUNTIME_ERROR;
 				frame = &frames[frameCount - 1];
 				break;
+			case INVOKE:
+				ObjString* method = READ_STRING();
+				ubyte arity = READ_BYTE();
+				if (!invoke(method, arity))
+					return InterpretResult.RUNTIME_ERROR;
+				frame = &frames[frameCount - 1];
+				break;
 			case CLOSURE:
 				ObjFunc* func = READ_CONSTANT().asFunc();
 				ObjClosure* closure = allocateClosure(&this, func);
@@ -328,6 +342,10 @@ struct VM
 			case CLASS:
 				stack.push(Value.from(cast(Obj*) allocateClass(vm, READ_STRING())));
 				break;
+
+			case METHOD:
+				defineMethod(READ_STRING());
+				break;
 			}
 		}
 	}
@@ -338,9 +356,22 @@ struct VM
 		{
 			switch (callee.objType) with (ObjType)
 			{
+			case BOUND_METHOD:
+				auto bound = callee.asBoundMethod();
+				vm.stack.back[-arity - 1] = bound.receiver;
+				return call(bound.method, arity);
 			case CLASS:
 				ObjClass* klass = callee.asClass;
 				vm.stack.back[-arity - 1] = Value.from(cast(Obj*) allocateInstance(vm, klass));
+				Value initializer;
+				if (klass.methods.get(initString, &initializer))
+					return call(initializer.asClosure(), arity);
+				else if (arity != 0)
+				{
+					runtimeError("Expected 0 arguments but got %d", arity);
+					return false;
+				}
+
 				return true;
 			case CLOSURE:
 				return call(callee.asClosure, arity);
@@ -356,6 +387,56 @@ struct VM
 		}
 		runtimeError("Can only call functions and classes");
 		return false;
+	}
+
+	bool invoke(ObjString* name, ubyte arity)
+	{
+		Value receiver = stack.peek(arity);
+
+		if (!receiver.isInstance())
+		{
+			runtimeError("Only instances have methods");
+			return false;
+		}
+
+		ObjInstance* inst = receiver.asInstance();
+
+		Value value;
+		if (inst.fields.get(name, &value))
+		{
+			stack.back[-arity - 1] = value;
+			return callValue(value, arity);
+		}
+
+		return invokeFromClass(inst.klass, name, arity);
+	}
+
+	bool invokeFromClass(ObjClass* klass, ObjString* name, ubyte arity)
+	{
+		Value method;
+		if (!klass.methods.get(name, &method))
+		{
+			runtimeError("Undefined property '%s", name.chars);
+			return false;
+		}
+
+		return call(method.asClosure(), arity);
+	}
+
+	bool bindMethod(ObjClass* klass, ObjString* name)
+	{
+		Value method;
+		if (!klass.methods.get(name, &method))
+		{
+			runtimeError("Undefined property '%s'", name.chars);
+			return false;
+		}
+
+		ObjBoundMethod* bound = allocateBoundMethod(&this, stack.peek(0), method.asClosure());
+
+		stack.pop();
+		stack.push(Value.from(cast(Obj*) bound));
+		return true;
 	}
 
 	ObjUpvalue* captureUpvalue(Value* local)
@@ -394,6 +475,14 @@ struct VM
 			upvalue.location = &upvalue.closed;
 			openUpvalues = upvalue.next;
 		}
+	}
+
+	void defineMethod(ObjString* name)
+	{
+		Value method = stack.peek(0);
+		ObjClass* klass = stack.peek(1).asClass();
+		klass.methods.set(name, method);
+		stack.pop();
 	}
 
 	bool call(ObjClosure* closure, ubyte arity)

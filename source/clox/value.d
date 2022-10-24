@@ -181,6 +181,16 @@ struct Value
 	{
 		return cast(ObjInstance*) asObj;
 	}
+
+	bool isBoundMethod()
+	{
+		return isObjType(ObjType.BOUND_METHOD);
+	}
+
+	ObjBoundMethod* asBoundMethod()
+	{
+		return cast(ObjBoundMethod*) asObj;
+	}
 }
 
 void printValue(Value value)
@@ -210,6 +220,10 @@ void printObj(Value value)
 
 	final switch (value.objType) with (ObjType)
 	{
+	case BOUND_METHOD:
+		printFunc(value.asBoundMethod().method.func);
+		break;
+
 	case CLASS:
 		printf("%s", value.asClass.name.chars);
 		break;

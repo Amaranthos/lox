@@ -9,6 +9,7 @@ import core.stdc.stdio : printf;
 
 enum ObjType : ushort
 {
+	BOUND_METHOD,
 	CLASS,
 	CLOSURE,
 	FUNC,
@@ -54,7 +55,13 @@ struct Obj
 
 		final switch (type) with (ObjType)
 		{
+		case BOUND_METHOD:
+			freeObj!ObjBoundMethod(&this);
+			break;
+
 		case CLASS:
+			ObjClass* klass = cast(ObjClass*)(&this);
+			klass.methods.free();
 			freeObj!ObjClass(&this);
 			break;
 
@@ -250,12 +257,14 @@ struct ObjClass
 {
 	Obj obj;
 	ObjString* name;
+	Table methods;
 }
 
 ObjClass* allocateClass(VM* vm, ObjString* name)
 {
 	ObjClass* klass = allocateObj!ObjClass(vm, ObjType.CLASS);
 	klass.name = name;
+	klass.methods = Table();
 
 	return klass;
 }
@@ -274,5 +283,22 @@ ObjInstance* allocateInstance(VM* vm, ObjClass* klass)
 	ObjInstance* inst = allocateObj!ObjInstance(vm, ObjType.INSTANCE);
 	inst.klass = klass;
 	inst.fields = Table();
+
 	return inst;
+}
+
+struct ObjBoundMethod
+{
+	Obj obj;
+	Value receiver;
+	ObjClosure* method;
+}
+
+ObjBoundMethod* allocateBoundMethod(VM* vm, Value receiver, ObjClosure* method)
+{
+	ObjBoundMethod* bound = allocateObj!ObjBoundMethod(vm, ObjType.BOUND_METHOD);
+	bound.receiver = receiver;
+	bound.method = method;
+
+	return bound;
 }

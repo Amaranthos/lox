@@ -5,7 +5,7 @@ import clox.memory;
 import clox.obj;
 import clox.value;
 
-enum TABLE_MAX_LOAD = 1;
+enum TABLE_MAX_LOAD = 0.75;
 
 struct Entry
 {

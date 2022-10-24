@@ -69,7 +69,7 @@ ParseRule[] rules = [
 	Token.Type.PRINT:         ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.RETURN:        ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.SUPER:         ParseRule(null,      null,    Precedence.NONE),
-	Token.Type.THIS:          ParseRule(null,      null,    Precedence.NONE),
+	Token.Type.THIS:          ParseRule(&this_,    null,    Precedence.NONE),
 	Token.Type.TRUE:          ParseRule((Parser* p, bool _) { p.emitByte(Op.TRUE); },  null,    Precedence.NONE),
 	Token.Type.VAR:           ParseRule(null,      null,    Precedence.NONE),
 	Token.Type.WHILE:         ParseRule(null,      null,    Precedence.NONE),

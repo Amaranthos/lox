@@ -149,6 +149,8 @@ int disassemble(Chunk* chunk, int offset)
 
 	case CALL:
 		return byteInstr(CALL.stringof, chunk, offset);
+	case INVOKE:
+		return invokeInstr(INVOKE.stringof, chunk, offset);
 	case CLOSURE:
 		++offset;
 		ubyte constant = chunk.code[offset++];
@@ -176,6 +178,8 @@ int disassemble(Chunk* chunk, int offset)
 
 	case CLASS:
 		return constInstr(CLASS.stringof, chunk, offset);
+	case METHOD:
+		return constInstr(METHOD.stringof, chunk, offset);
 	}
 }
 
@@ -207,4 +211,15 @@ int constInstr(string name, Chunk* chunk, int offset)
 	printValue(chunk.constants[constIdx]);
 	printf("'\n");
 	return offset + 2;
+}
+
+int invokeInstr(string name, Chunk* chunk, int offset)
+{
+	ubyte constant = chunk.code[offset + 1];
+	ubyte arity = chunk.code[offset + 2];
+
+	printf("%-16s (%d args) %4d '", name.ptr, arity, constant);
+	printValue(chunk.constants.ptr[constant]);
+	printf("'\n");
+	return offset + 3;
 }

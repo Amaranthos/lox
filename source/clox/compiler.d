@@ -11,6 +11,7 @@ import clox.value;
 import clox.vm;
 
 Compiler* compiler;
+ClassCompiler* classCompiler;
 
 enum UBYTE_COUNT = ubyte.max + 1;
 
@@ -47,7 +48,14 @@ void markCompilerRoots()
 enum FuncType
 {
 	FUNC,
-	SCRIPT
+	INIT,
+	METHOD,
+	SCRIPT,
+}
+
+struct ClassCompiler
+{
+	ClassCompiler* enclosing;
 }
 
 struct Compiler
@@ -80,8 +88,16 @@ struct Compiler
 
 		Local* local = &locals[localCount++];
 		local.depth = 0;
-		local.name.start = "";
-		local.name.length = 0;
+		if (type != FuncType.FUNC)
+		{
+			local.name.start = "this";
+			local.name.length = 4;
+		}
+		else
+		{
+			local.name.start = "";
+			local.name.length = 0;
+		}
 	}
 }
 
@@ -327,7 +343,11 @@ struct Parser
 
 	void emitReturn()
 	{
-		emitByte(Op.NIL);
+		if (compiler.type == FuncType.INIT)
+			emitBytes(Op.GET_LOCAL, 0);
+		else
+			emitByte(Op.NIL);
+
 		emitByte(Op.RETURN);
 	}
 
@@ -465,6 +485,12 @@ void dot(Parser* parser, bool canAssign)
 		expression(parser);
 		parser.emitBytes(Op.SET_PROP, name);
 	}
+	else if (parser.match(Token.LEFT_PAREN))
+	{
+		ubyte arity = parser.argumentList();
+		parser.emitBytes(Op.INVOKE, name);
+		parser.emitByte(arity);
+	}
 	else
 	{
 		parser.emitBytes(Op.GET_PROP, name);
@@ -522,6 +548,16 @@ void namedVariable(Parser* parser, Token name, bool canAssign)
 void variable(Parser* parser, bool canAssign)
 {
 	namedVariable(parser, parser.previous, canAssign);
+}
+
+void this_(Parser* parser, bool canAssign)
+{
+	if (classCompiler is null)
+	{
+		parser.error("Can't use 'this' outside of a class");
+		return;
+	}
+	variable(parser, false);
 }
 
 void unary(Parser* parser, bool _)
@@ -637,18 +673,49 @@ void func(Parser* parser, FuncType type)
 	}
 }
 
+void method(Parser* parser)
+{
+	parser.consume(Token.IDENTIFIER, "Expect method name");
+	ubyte constant = parser.identifierConstant(&parser.previous);
+
+	import core.stdc.string : memcmp;
+
+	FuncType type = FuncType.METHOD;
+	if (parser.previous.length == 4 && memcmp(parser.previous.start, "init".ptr, 4) == 0)
+		type = FuncType.INIT;
+
+	func(parser, type);
+
+	parser.emitBytes(Op.METHOD, constant);
+}
+
 void classDeclaration(Parser* parser)
 {
 	parser.consume(Token.IDENTIFIER, "Expect class name");
+	Token className = parser.previous;
 	ubyte nameConstant = parser.identifierConstant(&parser.previous);
 	parser.declareVariable();
 
 	parser.emitBytes(Op.CLASS, nameConstant);
 	parser.defineVariable(nameConstant);
 
+	ClassCompiler _classComplier;
+	_classComplier.enclosing = classCompiler;
+	classCompiler = &_classComplier;
+
+	namedVariable(parser, className, false);
+
 	parser.consume(Token.LEFT_BRACE, "Expect '{' before class body");
 
+	while (!parser.check(Token.RIGHT_BRACE) && !parser.check(Token.EOF))
+	{
+		method(parser);
+	}
+
 	parser.consume(Token.RIGHT_BRACE, "Expect '}' after class body");
+	parser.emitByte(Op.POP);
+
+	classCompiler = classCompiler.enclosing;
 }
 
 void beginScope()
@@ -735,6 +802,9 @@ void returnStatement(Parser* parser)
 		parser.emitReturn();
 	else
 	{
+		if (compiler.type == FuncType.INIT)
+			parser.error("Can't return a value from an initializer");
+
 		expression(parser);
 		parser.consume(Token.SEMICOLON, "Exepect ';' after return value");
 		parser.emitByte(Op.RETURN);

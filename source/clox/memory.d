@@ -100,6 +100,7 @@ void markRoots()
 	import clox.compiler : markCompilerRoots;
 
 	markCompilerRoots();
+	markObj(cast(Obj*) vm.initString);
 }
 
 void traceReferences()
@@ -130,9 +131,15 @@ void blackenObj(Obj* obj)
 
 	final switch (obj.type) with (ObjType)
 	{
+	case BOUND_METHOD:
+		ObjBoundMethod* bound = cast(ObjBoundMethod*) obj;
+		markValue(bound.receiver);
+		markObj(cast(Obj*) bound.method);
+		break;
 	case CLASS:
 		ObjClass* klass = cast(ObjClass*) obj;
 		markObj(cast(Obj*) klass.name);
+		markTable(&klass.methods);
 		break;
 	case CLOSURE:
 		ObjClosure* closure = cast(ObjClosure*) obj;
