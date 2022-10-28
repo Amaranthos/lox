@@ -170,6 +170,13 @@ struct VM
 					return InterpretResult.RUNTIME_ERROR;
 				}
 				break;
+			case GET_SUPER:
+				ObjString* name = READ_STRING();
+				ObjClass* superclass = stack.pop().asClass();
+
+				if (!bindMethod(superclass, name))
+					return InterpretResult.RUNTIME_ERROR;
+				break;
 
 			case GET_UPVALUE:
 				ubyte slot = READ_BYTE();
@@ -304,6 +311,14 @@ struct VM
 					return InterpretResult.RUNTIME_ERROR;
 				frame = &frames[frameCount - 1];
 				break;
+			case SUPER_INVOKE:
+				ObjString* method = READ_STRING();
+				ubyte arity = READ_BYTE();
+				ObjClass* superclass = stack.pop().asClass();
+				if (!invokeFromClass(superclass, method, arity))
+					return InterpretResult.RUNTIME_ERROR;
+				frame = &frames[frameCount - 1];
+				break;
 			case CLOSURE:
 				ObjFunc* func = READ_CONSTANT().asFunc();
 				ObjClosure* closure = allocateClosure(&this, func);
@@ -341,6 +356,20 @@ struct VM
 
 			case CLASS:
 				stack.push(Value.from(cast(Obj*) allocateClass(vm, READ_STRING())));
+				break;
+
+			case INHERIT:
+				Value superclass = stack.peek(1);
+
+				if (!superclass.isClass())
+				{
+					runtimeError("Superclass must be a class");
+					return InterpretResult.RUNTIME_ERROR;
+				}
+
+				ObjClass* subclass = stack.peek(0).asClass();
+				superclass.asClass().methods.addAll(&subclass.methods);
+				stack.pop();
 				break;
 
 			case METHOD:

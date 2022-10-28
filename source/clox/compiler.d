@@ -56,6 +56,7 @@ enum FuncType
 struct ClassCompiler
 {
 	ClassCompiler* enclosing;
+	bool hasSuperclass;
 }
 
 struct Compiler
@@ -550,6 +551,40 @@ void variable(Parser* parser, bool canAssign)
 	namedVariable(parser, parser.previous, canAssign);
 }
 
+Token synthToken(in string text)
+{
+	Token token;
+	token.start = text.ptr;
+	token.length = text.length;
+	return token;
+}
+
+void super_(Parser* parser, bool canAssign)
+{
+	if (classCompiler is null)
+		parser.error("Can't use 'super' outside of a class");
+	else if (!classCompiler.hasSuperclass)
+		parser.error("Can't use 'super' in a class with no superclass");
+
+	parser.consume(Token.DOT, "Expect '.' after 'super'");
+	parser.consume(Token.IDENTIFIER, "Expect superclass method name");
+	ubyte name = parser.identifierConstant(&parser.previous);
+
+	namedVariable(parser, synthToken("this"), false);
+	if (parser.match(Token.LEFT_PAREN))
+	{
+		ubyte arity = parser.argumentList();
+		namedVariable(parser, synthToken("super"), false);
+		parser.emitBytes(Op.SUPER_INVOKE, name);
+		parser.emitByte(arity);
+	}
+	else
+	{
+		namedVariable(parser, synthToken("super"), false);
+		parser.emitBytes(Op.GET_SUPER, name);
+	}
+}
+
 void this_(Parser* parser, bool canAssign)
 {
 	if (classCompiler is null)
@@ -700,8 +735,26 @@ void classDeclaration(Parser* parser)
 	parser.defineVariable(nameConstant);
 
 	ClassCompiler _classComplier;
+	_classComplier.hasSuperclass = false;
 	_classComplier.enclosing = classCompiler;
 	classCompiler = &_classComplier;
+
+	if (parser.match(Token.LESS))
+	{
+		parser.consume(Token.IDENTIFIER, "Expect superclass name");
+		variable(parser, false);
+
+		if (identifiersEqual(&className, &parser.previous))
+			parser.error("A class can't inherit from itself");
+
+		beginScope();
+		parser.addLocal(synthToken("super"));
+		parser.defineVariable(0);
+
+		namedVariable(parser, className, false);
+		parser.emitByte(Op.INHERIT);
+		classCompiler.hasSuperclass = true;
+	}
 
 	namedVariable(parser, className, false);
 
@@ -714,6 +767,9 @@ void classDeclaration(Parser* parser)
 
 	parser.consume(Token.RIGHT_BRACE, "Expect '}' after class body");
 	parser.emitByte(Op.POP);
+
+	if (classCompiler.hasSuperclass)
+		endScope(parser);
 
 	classCompiler = classCompiler.enclosing;
 }

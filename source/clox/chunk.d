@@ -113,6 +113,8 @@ int disassemble(Chunk* chunk, int offset)
 		return byteInstr(GET_PROP.stringof, chunk, offset);
 	case SET_PROP:
 		return byteInstr(SET_PROP.stringof, chunk, offset);
+	case GET_SUPER:
+		return constInstr(GET_SUPER.stringof, chunk, offset);
 
 	case EQUAL:
 		return simpleInstr(EQUAL.stringof, offset);
@@ -151,6 +153,8 @@ int disassemble(Chunk* chunk, int offset)
 		return byteInstr(CALL.stringof, chunk, offset);
 	case INVOKE:
 		return invokeInstr(INVOKE.stringof, chunk, offset);
+	case SUPER_INVOKE:
+		return invokeInstr(SUPER_INVOKE.stringof, chunk, offset);
 	case CLOSURE:
 		++offset;
 		ubyte constant = chunk.code[offset++];
@@ -178,6 +182,8 @@ int disassemble(Chunk* chunk, int offset)
 
 	case CLASS:
 		return constInstr(CLASS.stringof, chunk, offset);
+	case INHERIT:
+		return simpleInstr(INHERIT.stringof, offset);
 	case METHOD:
 		return constInstr(METHOD.stringof, chunk, offset);
 	}
