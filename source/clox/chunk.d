@@ -159,7 +159,7 @@ int disassemble(Chunk* chunk, int offset)
 		++offset;
 		ubyte constant = chunk.code[offset++];
 		printf("%-16s %4d ", CLOSURE.stringof.ptr, constant);
-		printValue(chunk.constants[constant]);
+		chunk.constants[constant].printValue();
 		printf("\n");
 
 		ObjFunc* func = chunk.constants[constant].asFunc;
@@ -214,7 +214,7 @@ int constInstr(string name, Chunk* chunk, int offset)
 {
 	ubyte constIdx = chunk.code[offset + 1];
 	printf("%-16s %4d '", name.ptr, constIdx);
-	printValue(chunk.constants[constIdx]);
+	chunk.constants[constIdx].printValue();
 	printf("'\n");
 	return offset + 2;
 }
@@ -225,7 +225,7 @@ int invokeInstr(string name, Chunk* chunk, int offset)
 	ubyte arity = chunk.code[offset + 2];
 
 	printf("%-16s (%d args) %4d '", name.ptr, arity, constant);
-	printValue(chunk.constants.ptr[constant]);
+	chunk.constants.ptr[constant].printValue();
 	printf("'\n");
 	return offset + 3;
 }

@@ -110,7 +110,7 @@ struct VM
 				for (Value* slot = stack.ptr; slot < stack.back; ++slot)
 				{
 					printf("[ ");
-					printValue(*slot);
+					slot.printValue();
 					printf(" ]");
 				}
 				printf("\n");
@@ -279,7 +279,7 @@ struct VM
 				break;
 
 			case PRINT:
-				printValue(stack.pop());
+				stack.pop().printValue();
 				printf("\n");
 				break;
 

@@ -9,6 +9,7 @@
       "archType": "$current",
       "buildType": "$current",
       "configuration": "$current",
+      "args": ["-v"],
       "problemMatcher": ["$dmd"],
       "group": "build",
       "label": "dub: Build",

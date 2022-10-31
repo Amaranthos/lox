@@ -85,7 +85,8 @@ struct Table
 		if (count == 0)
 			return null;
 
-		uint idx = hash % capacity;
+		uint idx = hash & (capacity - 1);
+		// uint idx = hash % capacity;
 		while (true)
 		{
 			Entry* entry = &entries[idx];
@@ -99,7 +100,8 @@ struct Table
 				return entry.key;
 			}
 
-			idx = (idx + 1) % capacity;
+			idx = (idx + 1) & (capacity - 1);
+			// idx = (idx + 1) % capacity;
 		}
 	}
 }
@@ -108,6 +110,7 @@ Entry* findEntry(Entry* entries, size_t capacity, ObjString* key)
 {
 	Entry* tombstone;
 	uint idx = key.hash & (capacity - 1);
+	// uint idx = key.hash % capacity;
 	while (true)
 	{
 		Entry* entry = &entries[idx];
@@ -122,6 +125,7 @@ Entry* findEntry(Entry* entries, size_t capacity, ObjString* key)
 			return entry;
 
 		idx = (idx + 1) & (capacity - 1);
+		// idx = (idx + 1) % capacity;
 	}
 }
 
